@@ -1,8 +1,85 @@
 @import "tailwindcss";
 
 :root {
+  --background: #0a0a0a;
+  --foreground: #ededed;
+}
+
+html[data-theme="light"] {
   --background: #ffffff;
   --foreground: #171717;
+}
+
+html[data-theme="light"] .bg-zinc-950,
+html[data-theme="light"] .bg-zinc-950\/95,
+html[data-theme="light"] .bg-zinc-950\/90,
+html[data-theme="light"] .bg-zinc-950\/80,
+html[data-theme="light"] .bg-zinc-950\/70,
+html[data-theme="light"] .bg-zinc-950\/60,
+html[data-theme="light"] .bg-zinc-950\/50,
+html[data-theme="light"] .bg-zinc-950\/40 {
+  background-color: #ffffff !important;
+}
+
+html[data-theme="light"] .bg-zinc-900,
+html[data-theme="light"] .bg-zinc-900\/95,
+html[data-theme="light"] .bg-zinc-900\/90,
+html[data-theme="light"] .bg-zinc-900\/80,
+html[data-theme="light"] .bg-zinc-900\/70,
+html[data-theme="light"] .bg-zinc-900\/60,
+html[data-theme="light"] .bg-zinc-900\/50,
+html[data-theme="light"] .bg-zinc-900\/40,
+html[data-theme="light"] .bg-zinc-900\/30,
+html[data-theme="light"] .bg-zinc-900\/20 {
+  background-color: #f8fafc !important;
+}
+
+html[data-theme="light"] .bg-zinc-800,
+html[data-theme="light"] .bg-zinc-800\/95,
+html[data-theme="light"] .bg-zinc-800\/90,
+html[data-theme="light"] .bg-zinc-800\/80,
+html[data-theme="light"] .bg-zinc-800\/70,
+html[data-theme="light"] .bg-zinc-800\/60,
+html[data-theme="light"] .bg-zinc-800\/50,
+html[data-theme="light"] .bg-zinc-800\/40,
+html[data-theme="light"] .bg-zinc-800\/30 {
+  background-color: #f1f5f9 !important;
+}
+
+html[data-theme="light"] .text-zinc-100,
+html[data-theme="light"] .text-zinc-200,
+html[data-theme="light"] .text-zinc-300 {
+  color: #111827 !important;
+}
+
+html[data-theme="light"] .text-zinc-400,
+html[data-theme="light"] .text-zinc-500,
+html[data-theme="light"] .text-zinc-600,
+html[data-theme="light"] .text-zinc-700 {
+  color: #4b5563 !important;
+}
+
+html[data-theme="light"] .border-zinc-800,
+html[data-theme="light"] .border-zinc-700,
+html[data-theme="light"] .border-zinc-600 {
+  border-color: #d4d4d8 !important;
+}
+
+html[data-theme="light"] .hover\:bg-zinc-800:hover,
+html[data-theme="light"] .hover\:bg-zinc-800\/80:hover,
+html[data-theme="light"] .hover\:bg-zinc-900:hover {
+  background-color: #e2e8f0 !important;
+}
+
+html[data-theme="light"] .hover\:text-zinc-200:hover,
+html[data-theme="light"] .hover\:text-zinc-100:hover {
+  color: #111827 !important;
+}
+
+html[data-theme="light"] button[aria-label*="тему"] {
+  border-color: #d4d4d8 !important;
+  background-color: rgb(255 255 255 / 0.9) !important;
+  color: #111827 !important;
 }
 
 @theme inline {
@@ -12,15 +89,11 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
-}
-
 body {
   background: var(--background);
   color: var(--foreground);
   font-family: Arial, Helvetica, sans-serif;
+  transition:
+    background-color 300ms ease,
+    color 300ms ease;
 }
