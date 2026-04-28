@@ -108,6 +108,10 @@ html[data-theme="light"] button[aria-label*="тему"] {
   color: #111827 !important;
 }
 
+html[data-theme="light"] .footer-studio-credit {
+  color: #a1a1aa !important;
+}
+
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);

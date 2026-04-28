@@ -1,3 +1,4 @@
+import Image from "next/image";
 import Link from "next/link";
 
 const footerLinks = [
@@ -21,9 +22,26 @@ export function SiteFooter() {
           </Link>
         ))}
       </nav>
-      <p className="mt-4 text-center text-xs text-zinc-500">
-        © 2026 SalesCoach. Гришин Максим Александрович, ИНН 270414087648
-      </p>
+      <div className="mt-4 border-t border-zinc-800 py-4">
+        <p className="footer-studio-credit text-center text-xs text-zinc-500">
+          © 2026 SalesCoach | Разработано{" "}
+          <Image
+            src="/vizi-studio-logo.png"
+            alt="Vizi Studio"
+            width={24}
+            height={24}
+            className="mx-1 inline-block align-middle"
+          />
+          <a
+            href="https://vizi.studio"
+            target="_blank"
+            rel="noreferrer"
+            className="transition hover:text-teal-300"
+          >
+            Vizi Studio
+          </a>
+        </p>
+      </div>
     </footer>
   );
 }
