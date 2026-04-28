@@ -1,6 +1,7 @@
 "use client";
 
 import { createClient } from "@/lib/supabase";
+import { SiteFooter } from "@/components/site-footer";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -142,9 +143,7 @@ export default function LoginPage() {
           </form>
         </div>
 
-        <p className="mt-8 text-center text-xs text-zinc-600">
-          Продолжая, вы соглашаетесь с политикой сервиса
-        </p>
+        <SiteFooter />
       </div>
     </div>
   );
