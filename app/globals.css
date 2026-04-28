@@ -76,6 +76,32 @@ html[data-theme="light"] .hover\:text-zinc-100:hover {
   color: #111827 !important;
 }
 
+html[data-theme="light"] .text-teal-200,
+html[data-theme="light"] .text-teal-300,
+html[data-theme="light"] .text-teal-400,
+html[data-theme="light"] .text-teal-500,
+html[data-theme="light"] .text-green-400,
+html[data-theme="light"] .text-green-500,
+html[data-theme="light"] .text-green-600,
+html[data-theme="light"] .text-\[\#0d9488\],
+html[data-theme="light"] .text-\[\#5eead4\] {
+  color: #15803d !important;
+}
+
+html[data-theme="light"] .hover\:text-teal-200:hover,
+html[data-theme="light"] .hover\:text-teal-300:hover,
+html[data-theme="light"] .hover\:text-teal-400:hover {
+  color: #166534 !important;
+}
+
+html[data-theme="light"] .brand-logo {
+  color: #18181b !important;
+}
+
+html[data-theme="dark"] .brand-logo {
+  color: #f4f4f5 !important;
+}
+
 html[data-theme="light"] button[aria-label*="тему"] {
   border-color: #d4d4d8 !important;
   background-color: rgb(255 255 255 / 0.9) !important;

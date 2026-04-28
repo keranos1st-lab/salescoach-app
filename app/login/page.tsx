@@ -60,7 +60,7 @@ export default function LoginPage() {
         <div className="mb-10 text-center">
           <Link
             href="/"
-            className="inline-block text-2xl font-semibold tracking-tight text-white"
+            className="brand-logo inline-block text-2xl font-semibold tracking-tight"
           >
             SalesCoach{" "}
             <span className="bg-gradient-to-r from-[#0d9488] to-teal-400 bg-clip-text text-transparent">
