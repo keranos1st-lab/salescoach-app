@@ -77,7 +77,7 @@ export default function PricingPage() {
           </p>
         </header>
 
-        <section className="mt-10 rounded-2xl border border-emerald-700/40 bg-emerald-900/15 p-6 sm:p-8">
+        <section className="pricing-trial-card mt-10 rounded-2xl border border-emerald-700/40 bg-emerald-900/15 p-6 sm:p-8">
           <p className="text-sm font-semibold uppercase tracking-wide text-emerald-300">
             Пробный период
           </p>
@@ -100,9 +100,9 @@ export default function PricingPage() {
           {plans.map((plan) => (
             <article
               key={plan.name}
-              className={`relative rounded-2xl border p-6 ${
+              className={`pricing-plan-card relative rounded-2xl border p-6 ${
                 plan.popular
-                  ? "border-teal-500/60 bg-zinc-900"
+                  ? "pricing-plan-card-popular border-teal-500/60 bg-zinc-900"
                   : "border-zinc-800 bg-zinc-900/70"
               }`}
             >
