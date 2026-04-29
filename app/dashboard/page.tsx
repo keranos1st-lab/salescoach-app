@@ -1,18 +1,18 @@
 import { AppShell } from "@/components/app-shell";
+import { authOptions } from "@/lib/auth";
 import { createClient } from "@/lib/supabase-server";
+import { getServerSession } from "next-auth";
 import { ScoreTrendChart } from "@/app/dashboard/score-trend-chart";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export default async function DashboardPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
     redirect("/login");
   }
+
+  const supabase = await createClient();
 
   const { data: callsRaw } = await supabase
     .from("calls")

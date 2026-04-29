@@ -1,4 +1,6 @@
 import { LogoutButton } from "@/app/dashboard/logout-button";
+import { getServerSession } from "next-auth";
+import { authOptions } from "@/lib/auth";
 import Link from "next/link";
 
 const nav = [
@@ -9,13 +11,16 @@ const nav = [
   { href: "/product", label: "Продукт 📦" },
 ] as const;
 
-export function AppShell({
+export async function AppShell({
   activeHref,
   children,
 }: {
   activeHref: string;
   children: React.ReactNode;
 }) {
+  const session = await getServerSession(authOptions);
+  const userTitle = session?.user?.name || session?.user?.email || "Пользователь";
+
   return (
     <div className="flex h-screen min-h-screen w-full overflow-hidden bg-zinc-950 text-zinc-100">
       <aside className="flex h-full min-h-0 w-56 shrink-0 flex-col overflow-hidden border-r border-zinc-800 bg-zinc-900/40">
@@ -49,6 +54,7 @@ export function AppShell({
           </div>
         </nav>
         <div className="shrink-0 border-t border-zinc-800 p-3">
+          <p className="mb-2 truncate text-xs text-zinc-400">{userTitle}</p>
           <LogoutButton />
         </div>
       </aside>

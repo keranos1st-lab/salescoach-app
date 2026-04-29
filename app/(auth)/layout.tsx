@@ -4,7 +4,7 @@ const inter = Inter({
   subsets: ["latin", "cyrillic"],
 });
 
-export default function LoginLayout({
+export default function AuthLayout({
   children,
 }: {
   children: React.ReactNode;

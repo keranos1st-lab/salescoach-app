@@ -3,9 +3,10 @@ import {
   mergeAutofillWithExisting,
   parseSiteTextToProfile,
 } from "@/lib/product-profile-autofill";
+import { getUserIdFromRequest } from "@/lib/request-auth";
 import { callWormsoftCompanyProfile, WormsoftError } from "@/lib/wormsoft-client";
 import type { CompanyProfileResponse } from "@/lib/wormsoft-types";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -42,16 +43,14 @@ function extract(html: string, regex: RegExp) {
   return match?.[1]?.trim() ?? "";
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = await getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     const body = (await request.json()) as {
       siteUrl?: string;
@@ -159,7 +158,7 @@ ${COMPANY_PROFILE_JSON_SCHEMA}`;
       .select(
         "niche, services, products, manual_description, regions, min_check, avg_check, priority_clients, unique_selling_points, upsell_services, anti_ideal_clients"
       )
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle();
 
     const parsedDraft = parseSiteTextToProfile(parsedText);
@@ -241,7 +240,7 @@ ${COMPANY_PROFILE_JSON_SCHEMA}`;
       .from("company_profile")
       .upsert(
         {
-          user_id: user.id,
+          user_id: userId,
           site_url: url.toString(),
           parsed_text: parsedText,
           niche,

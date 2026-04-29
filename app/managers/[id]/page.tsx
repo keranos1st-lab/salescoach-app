@@ -1,6 +1,8 @@
 import { AppShell } from "@/components/app-shell";
 import { ScoreTrendChart } from "@/app/dashboard/score-trend-chart";
+import { authOptions } from "@/lib/auth";
 import { createClient } from "@/lib/supabase-server";
+import { getServerSession } from "next-auth";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -24,20 +26,18 @@ function scoreColor(score: number | null) {
 
 export default async function ManagerDetailsPage(props: PageProps) {
   const { id } = await props.params;
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
     redirect("/login");
   }
+
+  const supabase = await createClient();
 
   const { data: managerRaw } = await supabase
     .from("managers")
     .select("id, name")
     .eq("id", id)
-    .eq("user_id", user.id)
+    .eq("user_id", session.user.id)
     .maybeSingle();
 
   if (!managerRaw) {

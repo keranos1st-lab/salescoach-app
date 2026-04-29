@@ -1,18 +1,17 @@
 import { createClient } from "@/lib/supabase-server";
-import { NextResponse } from "next/server";
+import { getUserIdFromRequest } from "@/lib/request-auth";
+import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = await getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     const body = (await request.json()) as { name?: string };
     const name = body?.name?.trim();
@@ -27,7 +26,7 @@ export async function POST(request: Request) {
     const { data, error } = await supabase
       .from("managers")
       .insert({
-        user_id: user.id,
+        user_id: userId,
         name,
         score_avg: 0,
         calls_count: 0,
@@ -49,16 +48,14 @@ export async function POST(request: Request) {
   }
 }
 
-export async function DELETE(request: Request) {
+export async function DELETE(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = await getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     const { searchParams } = new URL(request.url);
     const id = searchParams.get("id");
@@ -73,7 +70,7 @@ export async function DELETE(request: Request) {
       .from("managers")
       .delete()
       .eq("id", id)
-      .eq("user_id", user.id);
+      .eq("user_id", userId);
 
     if (error) {
       return NextResponse.json(

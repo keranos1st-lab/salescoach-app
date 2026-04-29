@@ -3,6 +3,7 @@ import {
   rowToCompanyProfile,
   type CompanyProfile,
 } from "@/lib/company-profile";
+import { getUserIdFromRequest } from "@/lib/request-auth";
 import { createClient } from "@/lib/supabase-server";
 import {
   callWormsoftCallAnalysis,
@@ -10,7 +11,7 @@ import {
 } from "@/lib/wormsoft-client";
 import type { CallAnalysisResponse } from "@/lib/wormsoft-types";
 import { randomUUID } from "crypto";
-import { NextResponse } from "next/server";
+import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 export const maxDuration = 300;
@@ -128,8 +129,13 @@ ${CALL_ANALYSIS_JSON_SCHEMA}
 Не выдумывай факты, которых нет в транскрипте, и обязательно придерживайся границ 0–10 для оценок.`;
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const userId = await getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
+    }
+
     const contentType = request.headers.get("content-type") ?? "";
 
     if (contentType.includes("application/json")) {
@@ -142,13 +148,6 @@ export async function POST(request: Request) {
       }
 
       const supabase = await createClient();
-      const {
-        data: { user },
-      } = await supabase.auth.getUser();
-
-      if (!user) {
-        return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
-      }
 
       const body = (await request.json()) as { transcript?: string };
       const transcript =
@@ -168,10 +167,10 @@ export async function POST(request: Request) {
         .select(
           "id, user_id, site_url, parsed_text, manual_description, niche, services, products, regions, min_check, avg_check, priority_clients, unique_selling_points, upsell_services, anti_ideal_clients, updated_at"
         )
-        .eq("user_id", user.id)
+        .eq("user_id", userId)
         .maybeSingle();
       const companyProfile = companyProfileRow
-        ? rowToCompanyProfile(companyProfileRow as Record<string, unknown>, user.id)
+        ? rowToCompanyProfile(companyProfileRow as Record<string, unknown>, userId)
         : null;
 
       try {
@@ -197,13 +196,6 @@ export async function POST(request: Request) {
     }
 
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
-    }
 
     const requestFormData = await request.formData();
     const file = requestFormData.get("file");
@@ -225,7 +217,7 @@ export async function POST(request: Request) {
       .from("managers")
       .select("id")
       .eq("id", managerId)
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle();
 
     if (mgrErr || !manager) {
@@ -240,10 +232,10 @@ export async function POST(request: Request) {
       .select(
         "id, user_id, site_url, parsed_text, manual_description, niche, services, products, regions, min_check, avg_check, priority_clients, unique_selling_points, upsell_services, anti_ideal_clients, updated_at"
       )
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle();
     const companyProfile = companyProfileRow
-      ? rowToCompanyProfile(companyProfileRow as Record<string, unknown>, user.id)
+      ? rowToCompanyProfile(companyProfileRow as Record<string, unknown>, userId)
       : null;
 
     const origName = file.name || "recording.webm";
@@ -251,7 +243,7 @@ export async function POST(request: Request) {
       ? origName.slice(origName.lastIndexOf("."))
       : ".webm";
     const base = sanitizeFilename(origName.replace(/\.[^.]+$/, ""));
-    const finalPath = `${user.id}/${randomUUID()}-${base}${ext}`;
+    const finalPath = `${userId}/${randomUUID()}-${base}${ext}`;
 
     const buffer = Buffer.from(await file.arrayBuffer());
 

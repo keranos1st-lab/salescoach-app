@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase-server";
-import { NextResponse } from "next/server";
+import { getUserIdFromRequest } from "@/lib/request-auth";
+import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
 export const runtime = "nodejs";
@@ -351,18 +352,16 @@ function providerErrorDetails(error: unknown): {
   };
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
+    const userId = await getUserIdFromRequest(request);
+    if (!userId) {
+      return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
+    }
+
     const apiKey = process.env.OPENAI_API_KEY?.trim();
 
     const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
-      return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
-    }
 
     const body = (await request.json()) as {
       managerId?: string;
@@ -389,7 +388,7 @@ export async function POST(request: Request) {
       .from("managers")
       .select("id, name")
       .eq("id", managerId)
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle();
 
     if (!manager) {

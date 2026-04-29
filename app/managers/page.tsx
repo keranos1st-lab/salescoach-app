@@ -1,17 +1,17 @@
 import { ManagersWorkspace, type ManagerRow } from "@/app/managers/managers-workspace";
 import { AppShell } from "@/components/app-shell";
+import { authOptions } from "@/lib/auth";
 import { createClient } from "@/lib/supabase-server";
+import { getServerSession } from "next-auth";
 import { redirect } from "next/navigation";
 
 export default async function ManagersPage() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
-
-  if (!user) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user?.id) {
     redirect("/login");
   }
+
+  const supabase = await createClient();
 
   const { data: managersRaw } = await supabase
     .from("managers")

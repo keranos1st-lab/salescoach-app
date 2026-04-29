@@ -3,7 +3,8 @@ import {
   mergeAutofillWithExisting,
   parseSiteTextToProfile,
 } from "@/lib/product-profile-autofill";
-import { NextResponse } from "next/server";
+import { getUserIdFromRequest } from "@/lib/request-auth";
+import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
@@ -13,16 +14,14 @@ function parseOptionalInt(v: unknown): number | null {
   return Number.isFinite(n) ? Math.round(n) : null;
 }
 
-export async function POST(request: Request) {
+export async function POST(request: NextRequest) {
   try {
-    const supabase = await createClient();
-    const {
-      data: { user },
-    } = await supabase.auth.getUser();
-
-    if (!user) {
+    const userId = await getUserIdFromRequest(request);
+    if (!userId) {
       return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
     }
+
+    const supabase = await createClient();
 
     const body = (await request.json()) as {
       siteUrl?: string | null;
@@ -61,7 +60,7 @@ export async function POST(request: Request) {
     const { data: existingProfile } = await supabase
       .from("company_profile")
       .select("niche, services, products, manual_description")
-      .eq("user_id", user.id)
+      .eq("user_id", userId)
       .maybeSingle();
 
     let mergedNiche = niche;
@@ -90,7 +89,7 @@ export async function POST(request: Request) {
 
     const { error } = await supabase.from("company_profile").upsert(
       {
-        user_id: user.id,
+        user_id: userId,
         site_url: siteUrl,
         parsed_text: parsedText,
         manual_description: mergedManualDescription,
