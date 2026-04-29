@@ -34,7 +34,7 @@ export async function POST(req: Request) {
   try {
     await resend.emails.send({
       from: "SalesCoach <noreply@saleschek.ru>",
-      to: ["info@saleschek.ru"],
+      to: ["keranosai@mail.ru"],
       subject: `Обратная связь от ${name}`,
       html: `
         <h2>Новое сообщение с сайта SalesCoach</h2>
