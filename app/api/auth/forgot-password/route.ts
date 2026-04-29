@@ -6,23 +6,26 @@ import crypto from "crypto";
 const resend = new Resend(process.env.RESEND_API_KEY);
 
 export async function POST(req: Request) {
-  const { email } = await req.json();
-  const user = await prisma.user.findUnique({ where: { email } });
+  try {
+    const { email } = await req.json();
+    console.log("[forgot-password] запрос для email:", email);
+    const user = await prisma.user.findUnique({ where: { email } });
+    console.log("[forgot-password] пользователь найден:", !!user);
 
-  // Always return success to avoid user enumeration.
-  if (!user) return NextResponse.json({ success: true });
+    // Always return success to avoid user enumeration.
+    if (!user) return NextResponse.json({ success: true });
 
-  const token = crypto.randomBytes(32).toString("hex");
-  const expiresAt = new Date(Date.now() + 1000 * 60 * 60);
+    const token = crypto.randomBytes(32).toString("hex");
+    const expiresAt = new Date(Date.now() + 1000 * 60 * 60);
 
-  await prisma.passwordResetToken.deleteMany({ where: { email } });
-  await prisma.passwordResetToken.create({ data: { email, token, expiresAt } });
+    await prisma.passwordResetToken.deleteMany({ where: { email } });
+    await prisma.passwordResetToken.create({ data: { email, token, expiresAt } });
 
-  await resend.emails.send({
-    from: "SalesCoach <noreply@send.saleschek.ru>",
-    to: [email],
-    subject: "Восстановление пароля — SalesCoach",
-    html: `
+    await resend.emails.send({
+      from: "SalesCoach <noreply@send.saleschek.ru>",
+      to: [email],
+      subject: "Восстановление пароля — SalesCoach",
+      html: `
       <h2>Восстановление пароля</h2>
       <p>Вы запросили сброс пароля для аккаунта SalesCoach.</p>
       <p><a href="${process.env.NEXTAUTH_URL}/reset-password?token=${token}" 
@@ -31,7 +34,12 @@ export async function POST(req: Request) {
       </a></p>
       <p>Ссылка действительна 1 час. Если вы не запрашивали сброс — просто проигнорируйте это письмо.</p>
     `,
-  });
+    });
 
-  return NextResponse.json({ success: true });
+    console.log("[forgot-password] письмо отправлено через Resend");
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("[forgot-password] ОШИБКА:", error);
+    return NextResponse.json({ error: String(error) }, { status: 500 });
+  }
 }

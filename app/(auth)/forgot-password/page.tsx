@@ -11,11 +11,12 @@ export default function ForgotPasswordPage() {
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setPending(true);
-    await fetch("/api/auth/forgot-password", {
+    const res = await fetch("/api/auth/forgot-password", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ email }),
     });
+    console.log("ответ сервера:", res.status, await res.text());
     setPending(false);
     setSent(true);
   }
