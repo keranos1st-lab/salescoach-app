@@ -3,20 +3,22 @@
 import { SiteFooter } from "@/components/site-footer";
 import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useRouter, useSearchParams } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
 export default function LoginPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
-  const successMessage =
-    searchParams.get("message") === "password-reset-success"
+  const [successMessage] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    const params = new URLSearchParams(window.location.search);
+    return params.get("message") === "password-reset-success"
       ? "Пароль изменён, войдите снова"
       : null;
+  });
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
