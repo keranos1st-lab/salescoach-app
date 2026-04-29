@@ -3,17 +3,49 @@
 import { SiteFooter } from "@/components/site-footer";
 import { useState } from "react";
 
+type Feedback = { kind: "success" | "error"; text: string } | null;
+
 export default function ContactsPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [message, setMessage] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [feedback, setFeedback] = useState<Feedback>(null);
 
-  function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
+  async function handleSubmit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    alert("Спасибо! Мы свяжемся с вами в течение 24 часов");
-    setName("");
-    setEmail("");
-    setMessage("");
+    setFeedback(null);
+    setSubmitting(true);
+
+    try {
+      const response = await fetch("/api/contact", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ name, email, message }),
+      });
+
+      if (response.ok) {
+        setFeedback({
+          kind: "success",
+          text: "Спасибо! Мы свяжемся с вами.",
+        });
+        setName("");
+        setEmail("");
+        setMessage("");
+      } else {
+        setFeedback({
+          kind: "error",
+          text: "Что-то пошло не так, попробуйте позже.",
+        });
+      }
+    } catch {
+      setFeedback({
+        kind: "error",
+        text: "Что-то пошло не так, попробуйте позже.",
+      });
+    } finally {
+      setSubmitting(false);
+    }
   }
 
   return (
@@ -58,6 +90,16 @@ export default function ContactsPage() {
 
         <section className="mt-8 rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6">
           <h2 className="text-xl font-semibold">Форма обратной связи</h2>
+          {feedback && (
+            <p
+              className={`mt-3 text-sm ${
+                feedback.kind === "success" ? "text-teal-400" : "text-red-400"
+              }`}
+              role="alert"
+            >
+              {feedback.text}
+            </p>
+          )}
           <form className="mt-5 space-y-4" onSubmit={handleSubmit}>
             <input
               value={name}
@@ -84,9 +126,10 @@ export default function ContactsPage() {
             />
             <button
               type="submit"
-              className="rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-500"
+              disabled={submitting}
+              className="rounded-xl bg-teal-600 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-500 disabled:opacity-60"
             >
-              Отправить
+              {submitting ? "Отправка…" : "Отправить"}
             </button>
           </form>
         </section>
