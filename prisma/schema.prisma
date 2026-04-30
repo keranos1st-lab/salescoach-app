@@ -22,6 +22,8 @@ model User {
   role      String   @default("user")
   plan      String   @default("free")
   createdAt DateTime @default(now())
+
+  @@schema("public")
 }
 
 model PasswordResetToken {
@@ -30,4 +32,6 @@ model PasswordResetToken {
   token     String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
+
+  @@schema("public")
 }
