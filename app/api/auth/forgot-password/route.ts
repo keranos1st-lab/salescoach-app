@@ -21,7 +21,7 @@ export async function POST(req: Request) {
     await prisma.passwordResetToken.deleteMany({ where: { email } });
     await prisma.passwordResetToken.create({ data: { email, token, expiresAt } });
 
-    await resend.emails.send({
+    const result = await resend.emails.send({
       from: "SalesCoach <noreply@send.saleschek.ru>",
       to: [email],
       subject: "Восстановление пароля — SalesCoach",
@@ -36,7 +36,14 @@ export async function POST(req: Request) {
     `,
     });
 
-    console.log("[forgot-password] письмо отправлено через Resend");
+    console.log("[forgot-password] ответ Resend:", JSON.stringify(result));
+
+    if (result.error) {
+      console.error("[forgot-password] Resend error:", result.error);
+      return NextResponse.json({ error: result.error }, { status: 500 });
+    }
+
+    console.log("[forgot-password] письмо отправлено, ID:", result.data?.id);
     return NextResponse.json({ success: true });
   } catch (error) {
     console.error("[forgot-password] ОШИБКА:", error);
