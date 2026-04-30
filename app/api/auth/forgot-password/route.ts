@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     await prisma.passwordResetToken.create({ data: { email, token, expiresAt } });
 
     const result = await resend.emails.send({
-      from: "SalesCoach <noreply@send.saleschek.ru>",
+      from: "noreply@saleschek.ru",
       to: [email],
       subject: "Восстановление пароля — SalesCoach",
       html: `
