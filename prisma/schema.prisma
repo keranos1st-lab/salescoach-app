@@ -1,27 +1,25 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
-  provider = "prisma-client-js"
+  provider        = "prisma-client-js"
+  previewFeatures = ["multiSchema"]
 }
 
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
-  schemas   = ["public", "auth"]
+  schemas   = ["public"]
 }
 
 model User {
-  id        String   @id @default(cuid())
-  name      String?
-  email     String   @unique
-  password  String?
-  role      String   @default("user")
-  plan      String   @default("free")
-  createdAt DateTime @default(now())
+  id              String           @id @default(cuid())
+  name            String?
+  email           String           @unique
+  password        String?
+  role            String           @default("user")
+  plan            String           @default("free")
+  createdAt       DateTime         @default(now())
+  managers        managers[]
+  company_profile company_profile?
 
   @@schema("public")
 }
@@ -32,6 +30,56 @@ model PasswordResetToken {
   token     String   @unique
   expiresAt DateTime
   createdAt DateTime @default(now())
+
+  @@schema("public")
+}
+
+model managers {
+  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id     String?
+  name        String
+  score_avg   Decimal?  @default(0) @db.Decimal
+  calls_count Int?      @default(0)
+  created_at  DateTime? @default(now()) @db.Timestamptz(6)
+  calls       calls[]
+  user        User?     @relation(fields: [user_id], references: [id], onDelete: Cascade)
+
+  @@schema("public")
+}
+
+model calls {
+  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  manager_id String?   @db.Uuid
+  audio_url  String?
+  transcript String?
+  score      Int?
+  positives  Json?
+  negatives  Json?
+  next_task  String?
+  created_at DateTime? @default(now()) @db.Timestamptz(6)
+  managers   managers? @relation(fields: [manager_id], references: [id], onDelete: Cascade)
+
+  @@schema("public")
+}
+
+model company_profile {
+  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
+  user_id               String    @unique
+  site_url              String?
+  parsed_text           String?
+  manual_description    String?
+  updated_at            DateTime? @default(now()) @db.Timestamptz(6)
+  niche                 String?
+  services              String[]
+  products              String[]
+  regions               String[]
+  min_check             Decimal?  @db.Decimal
+  avg_check             Decimal?  @db.Decimal
+  priority_clients      String?
+  unique_selling_points String[]
+  upsell_services       String[]
+  anti_ideal_clients    String?
+  user                  User      @relation(fields: [user_id], references: [id], onDelete: NoAction)
 
   @@schema("public")
 }
