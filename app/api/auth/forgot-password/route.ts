@@ -3,8 +3,6 @@ import { prisma } from "@/lib/prisma";
 import { Resend } from "resend";
 import crypto from "crypto";
 
-const resend = new Resend(process.env.RESEND_API_KEY);
-
 export async function POST(req: Request) {
   try {
     const { email } = await req.json();
@@ -20,6 +18,12 @@ export async function POST(req: Request) {
 
     await prisma.passwordResetToken.deleteMany({ where: { email } });
     await prisma.passwordResetToken.create({ data: { email, token, expiresAt } });
+
+    if (!process.env.RESEND_API_KEY) {
+      return NextResponse.json({ error: "RESEND_API_KEY is missing" }, { status: 500 });
+    }
+
+    const resend = new Resend(process.env.RESEND_API_KEY);
 
     const result = await resend.emails.send({
       from: "noreply@saleschek.ru",
