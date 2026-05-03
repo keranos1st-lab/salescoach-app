@@ -1,10 +1,10 @@
+import { auth } from "@clerk/nextjs/server";
 import { buildProductCallSignals } from "@/lib/call-analysis-product-layer";
 import {
   rowToCompanyProfile,
   type CompanyProfile,
 } from "@/lib/company-profile";
-import { getUserIdFromRequest } from "@/lib/request-auth";
-import { createClient } from "@/lib/supabase-server";
+import { createClerkSupabaseClient } from "@/lib/supabase-clerk";
 import {
   callWormsoftCallAnalysis,
   WormsoftError,
@@ -131,7 +131,7 @@ ${CALL_ANALYSIS_JSON_SCHEMA}
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = await getUserIdFromRequest(request);
+    const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
     }
@@ -147,7 +147,7 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const supabase = await createClient();
+      const supabase = await createClerkSupabaseClient();
 
       const body = (await request.json()) as { transcript?: string };
       const transcript =
@@ -195,7 +195,7 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createClient();
+    const supabase = await createClerkSupabaseClient();
 
     const requestFormData = await request.formData();
     const file = requestFormData.get("file");
@@ -247,8 +247,7 @@ export async function POST(request: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // Storage: имя bucket должно совпадать с панелью Supabase (`calls-audio`). Клиент — createClient()
-    // из lib/supabase-server.ts (сессия пользователя из cookies + publishable key), не service role.
+    // Storage bucket `calls-audio`: клиент из createClerkSupabaseClient() (JWT Clerk в Authorization).
     const bucketId = "calls-audio";
     const { error: uploadErr } = await supabase.storage.from(bucketId).upload(finalPath, buffer, {
       contentType: file.type || "application/octet-stream",
@@ -396,6 +395,7 @@ export async function POST(request: NextRequest) {
     const { data: callRow, error: insertErr } = await supabase
       .from("calls")
       .insert({
+        user_id: userId,
         manager_id: managerId,
         audio_url: finalPath,
         transcript: transcriptText,

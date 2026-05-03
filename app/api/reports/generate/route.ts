@@ -1,5 +1,5 @@
-import { createClient } from "@/lib/supabase-server";
-import { getUserIdFromRequest } from "@/lib/request-auth";
+import { auth } from "@clerk/nextjs/server";
+import { createClerkSupabaseClient } from "@/lib/supabase-clerk";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -354,14 +354,14 @@ function providerErrorDetails(error: unknown): {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = await getUserIdFromRequest(request);
+    const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
     }
 
     const apiKey = process.env.OPENAI_API_KEY?.trim();
 
-    const supabase = await createClient();
+    const supabase = await createClerkSupabaseClient();
 
     const body = (await request.json()) as {
       managerId?: string;

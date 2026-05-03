@@ -6,26 +6,7 @@ export const runtime = "nodejs";
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId, getToken } = await auth();
-    const token = await getToken({
-      template: process.env.CLERK_SUPABASE_JWT_TEMPLATE || undefined,
-    });
-
-    // Debug лог
-    if (token) {
-      const payload = JSON.parse(
-        Buffer.from(token.split(".")[1], "base64").toString()
-      );
-      console.log("=== CLERK JWT DEBUG ===");
-      console.log("token exists:", !!token);
-      console.log("payload.sub:", payload.sub);
-      console.log("payload.role:", payload.role);
-      console.log("userId from auth():", userId);
-      console.log("======================");
-    } else {
-      console.log("=== TOKEN IS NULL ===");
-    }
-
+    const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
     }

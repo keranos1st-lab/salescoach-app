@@ -1,8 +1,7 @@
 import { AppShell } from "@/components/app-shell";
 import { ScoreTrendChart } from "@/app/dashboard/score-trend-chart";
-import { authOptions } from "@/lib/auth";
-import { createClient } from "@/lib/supabase-server";
-import { getServerSession } from "next-auth";
+import { createClerkSupabaseClient } from "@/lib/supabase-clerk";
+import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -26,18 +25,18 @@ function scoreColor(score: number | null) {
 
 export default async function ManagerDetailsPage(props: PageProps) {
   const { id } = await props.params;
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const { userId } = await auth();
+  if (!userId) {
     redirect("/login");
   }
 
-  const supabase = await createClient();
+  const supabase = await createClerkSupabaseClient();
 
   const { data: managerRaw } = await supabase
     .from("managers")
     .select("id, name")
     .eq("id", id)
-    .eq("user_id", session.user.id)
+    .eq("user_id", userId)
     .maybeSingle();
 
   if (!managerRaw) {

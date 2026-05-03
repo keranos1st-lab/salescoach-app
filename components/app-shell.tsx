@@ -1,6 +1,5 @@
 import { LogoutButton } from "@/app/dashboard/logout-button";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
+import { auth, currentUser } from "@clerk/nextjs/server";
 import Link from "next/link";
 
 const nav = [
@@ -18,8 +17,16 @@ export async function AppShell({
   activeHref: string;
   children: React.ReactNode;
 }) {
-  const session = await getServerSession(authOptions);
-  const userTitle = session?.user?.name || session?.user?.email || "Пользователь";
+  const { userId } = await auth();
+  let userTitle = "Пользователь";
+  if (userId) {
+    const user = await currentUser();
+    userTitle =
+      user?.firstName ||
+      user?.username ||
+      user?.primaryEmailAddress?.emailAddress ||
+      userTitle;
+  }
 
   return (
     <div className="flex h-screen min-h-screen w-full overflow-hidden bg-zinc-950 text-zinc-100">

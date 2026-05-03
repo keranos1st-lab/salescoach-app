@@ -1,18 +1,17 @@
 import { CallsWorkspace, type CallListItem } from "@/app/calls/calls-workspace";
 import { AppShell } from "@/components/app-shell";
-import { authOptions } from "@/lib/auth";
-import { createClient } from "@/lib/supabase-server";
-import { getServerSession } from "next-auth";
+import { createClerkSupabaseClient } from "@/lib/supabase-clerk";
+import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export default async function CallsPage() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const { userId } = await auth();
+  if (!userId) {
     redirect("/login");
   }
 
-  const supabase = await createClient();
+  const supabase = await createClerkSupabaseClient();
 
   const { data: managers } = await supabase
     .from("managers")
@@ -29,7 +28,7 @@ export default async function CallsPage() {
   const { data: companyProfile } = await supabase
     .from("company_profile")
     .select("manual_description, parsed_text")
-    .eq("user_id", session.user.id)
+    .eq("user_id", userId)
     .maybeSingle();
   const productContext =
     companyProfile?.manual_description?.trim() ||

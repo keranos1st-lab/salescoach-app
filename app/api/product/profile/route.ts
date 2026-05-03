@@ -1,9 +1,9 @@
-import { createClient } from "@/lib/supabase-server";
+import { auth } from "@clerk/nextjs/server";
 import {
   mergeAutofillWithExisting,
   parseSiteTextToProfile,
 } from "@/lib/product-profile-autofill";
-import { getUserIdFromRequest } from "@/lib/request-auth";
+import { createClerkSupabaseClient } from "@/lib/supabase-clerk";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -16,12 +16,12 @@ function parseOptionalInt(v: unknown): number | null {
 
 export async function POST(request: NextRequest) {
   try {
-    const userId = await getUserIdFromRequest(request);
+    const { userId } = await auth();
     if (!userId) {
       return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
     }
 
-    const supabase = await createClient();
+    const supabase = await createClerkSupabaseClient();
 
     const body = (await request.json()) as {
       siteUrl?: string | null;
@@ -105,7 +105,7 @@ export async function POST(request: NextRequest) {
         anti_ideal_clients,
         updated_at: new Date().toISOString(),
       },
-      { onConflict: "user_id" }
+      { onConflict: 'user_id' }
     );
 
     if (error) {

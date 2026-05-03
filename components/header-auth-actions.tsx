@@ -1,14 +1,21 @@
 import Link from "next/link";
-import { getServerSession } from "next-auth";
-import { authOptions } from "@/lib/auth";
-import { GuestAuthButtons, SignOutButton } from "@/components/auth-buttons";
+import { UserButton } from "@clerk/nextjs";
+import { auth, currentUser } from "@clerk/nextjs/server";
+import { GuestAuthButtons } from "@/components/auth-buttons";
 
 export async function HeaderAuthActions() {
-  const session = await getServerSession(authOptions);
+  const { userId } = await auth();
 
-  if (!session?.user) {
+  if (!userId) {
     return <GuestAuthButtons />;
   }
+
+  const user = await currentUser();
+  const label =
+    user?.firstName ||
+    user?.username ||
+    user?.primaryEmailAddress?.emailAddress ||
+    "Профиль";
 
   return (
     <div className="flex items-center gap-3">
@@ -16,9 +23,9 @@ export async function HeaderAuthActions() {
         href="/dashboard"
         className="rounded-lg border border-zinc-700 px-3 py-2 text-sm text-zinc-200"
       >
-        {session.user.name || session.user.email || "Пользователь"}
+        {label}
       </Link>
-      <SignOutButton />
+      <UserButton />
     </div>
   );
 }

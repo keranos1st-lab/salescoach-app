@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { ClerkProvider } from "@clerk/nextjs";
 import { HeaderAuthActions } from "@/components/header-auth-actions";
 import { AuthSessionProvider } from "@/components/session-provider";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -32,13 +33,15 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <body className="min-h-screen flex flex-col">
-        <AuthSessionProvider>
-          <header className="fixed right-4 top-4 z-50 flex items-center gap-2">
-            <HeaderAuthActions />
-            <ThemeToggle />
-          </header>
-          {children}
-        </AuthSessionProvider>
+        <ClerkProvider>
+          <AuthSessionProvider>
+            <header className="fixed right-4 top-4 z-50 flex items-center gap-2">
+              <HeaderAuthActions />
+              <ThemeToggle />
+            </header>
+            {children}
+          </AuthSessionProvider>
+        </ClerkProvider>
       </body>
     </html>
   );

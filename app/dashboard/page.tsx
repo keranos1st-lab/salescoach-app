@@ -1,18 +1,17 @@
 import { AppShell } from "@/components/app-shell";
-import { authOptions } from "@/lib/auth";
-import { createClient } from "@/lib/supabase-server";
-import { getServerSession } from "next-auth";
+import { createClerkSupabaseClient } from "@/lib/supabase-clerk";
 import { ScoreTrendChart } from "@/app/dashboard/score-trend-chart";
+import { auth } from "@clerk/nextjs/server";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export default async function DashboardPage() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const { userId } = await auth();
+  if (!userId) {
     redirect("/login");
   }
 
-  const supabase = await createClient();
+  const supabase = await createClerkSupabaseClient();
 
   const { data: callsRaw } = await supabase
     .from("calls")

@@ -1,9 +1,8 @@
 import { AppShell } from "@/components/app-shell";
-import { authOptions } from "@/lib/auth";
-import { createClient } from "@/lib/supabase-server";
-import { getServerSession } from "next-auth";
-import { redirect } from "next/navigation";
+import { createClerkSupabaseClient } from "@/lib/supabase-clerk";
 import { ReportsWorkspace } from "@/app/reports/reports-workspace";
+import { auth } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 
 export type ReportManager = {
   id: string;
@@ -11,12 +10,12 @@ export type ReportManager = {
 };
 
 export default async function ReportsPage() {
-  const session = await getServerSession(authOptions);
-  if (!session?.user?.id) {
+  const { userId } = await auth();
+  if (!userId) {
     redirect("/login");
   }
 
-  const supabase = await createClient();
+  const supabase = await createClerkSupabaseClient();
 
   const { data: managers } = await supabase
     .from("managers")
