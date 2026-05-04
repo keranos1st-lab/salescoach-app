@@ -25,6 +25,8 @@ export function ManagersWorkspace({
   const [managers, setManagers] = useState<ManagerRow[]>(initialManagers);
   const [modalOpen, setModalOpen] = useState(false);
   const [name, setName] = useState("");
+  const [phone, setPhone] = useState("");
+  const [title, setTitle] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
@@ -51,12 +53,21 @@ export function ManagersWorkspace({
       const res = await fetch("/api/managers", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name: trimmed }),
+        body: JSON.stringify({
+          name: trimmed,
+          phone: phone.trim() || null,
+          title: title.trim() || null,
+        }),
       });
 
       const json = (await res.json()) as {
         error?: string;
-        manager?: ManagerRow;
+        manager?: {
+          id: string;
+          name: string;
+          isActive: boolean;
+          createdAt: string;
+        };
       };
 
       if (!res.ok || !json.manager) {
@@ -64,8 +75,17 @@ export function ManagersWorkspace({
         return;
       }
 
-      setManagers((prev) => [json.manager!, ...prev]);
+      const row: ManagerRow = {
+        id: json.manager.id,
+        name: json.manager.name,
+        calls_count: 0,
+        score_avg: null,
+        created_at: json.manager.createdAt,
+      };
+      setManagers((prev) => [row, ...prev]);
       setName("");
+      setPhone("");
+      setTitle("");
       setModalOpen(false);
       router.refresh();
     } catch {
@@ -77,14 +97,14 @@ export function ManagersWorkspace({
 
   async function deleteManager(id: string) {
     const ok = window.confirm(
-      "Удалить менеджера? Все его звонки также будут удалены."
+      "Деактивировать менеджера? Он перестанет отображаться в списке."
     );
     if (!ok) return;
 
     setDeletingId(id);
     setError(null);
     try {
-      const res = await fetch(`/api/managers?id=${encodeURIComponent(id)}`, {
+      const res = await fetch(`/api/managers/${encodeURIComponent(id)}`, {
         method: "DELETE",
       });
       const json = (await res.json()) as { error?: string };
@@ -114,6 +134,9 @@ export function ManagersWorkspace({
           type="button"
           onClick={() => {
             setError(null);
+            setName("");
+            setPhone("");
+            setTitle("");
             setModalOpen(true);
           }}
           className="rounded-xl bg-[#0d9488] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#0d9488]/25 transition hover:bg-[#0f766e]"
@@ -191,20 +214,58 @@ export function ManagersWorkspace({
             <h2 className="text-lg font-semibold text-zinc-100">
               Добавить менеджера
             </h2>
-            <div className="mt-4 space-y-2">
-              <label
-                htmlFor="manager-name"
-                className="text-sm font-medium text-zinc-300"
-              >
-                Имя менеджера
-              </label>
-              <input
-                id="manager-name"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="Например: Иван Петров"
-                className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-[#0d9488] focus:ring-2 focus:ring-[#0d9488]/25"
-              />
+            <div className="mt-4 space-y-4">
+              <div className="space-y-2">
+                <label
+                  htmlFor="manager-name"
+                  className="text-sm font-medium text-zinc-300"
+                >
+                  Имя менеджера
+                </label>
+                <input
+                  id="manager-name"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  placeholder="Например: Иван Петров"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-[#0d9488] focus:ring-2 focus:ring-[#0d9488]/25"
+                />
+              </div>
+              <div className="space-y-2">
+                <label
+                  htmlFor="manager-phone"
+                  className="text-sm font-medium text-zinc-300"
+                >
+                  Телефон{" "}
+                  <span className="font-normal text-zinc-500">(необязательно)</span>
+                </label>
+                <input
+                  id="manager-phone"
+                  type="tel"
+                  autoComplete="tel"
+                  value={phone}
+                  onChange={(e) => setPhone(e.target.value)}
+                  placeholder="+7 …"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-[#0d9488] focus:ring-2 focus:ring-[#0d9488]/25"
+                />
+              </div>
+              <div className="space-y-2">
+                <label
+                  htmlFor="manager-title"
+                  className="text-sm font-medium text-zinc-300"
+                >
+                  Должность{" "}
+                  <span className="font-normal text-zinc-500">(необязательно)</span>
+                </label>
+                <input
+                  id="manager-title"
+                  type="text"
+                  autoComplete="organization-title"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  placeholder="Например: менеджер по продажам"
+                  className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-[#0d9488] focus:ring-2 focus:ring-[#0d9488]/25"
+                />
+              </div>
             </div>
             <div className="mt-6 flex justify-end gap-3">
               <button
@@ -213,6 +274,8 @@ export function ManagersWorkspace({
                   if (loading) return;
                   setModalOpen(false);
                   setName("");
+                  setPhone("");
+                  setTitle("");
                   setError(null);
                 }}
                 className="rounded-xl border border-zinc-700 px-4 py-2 text-sm font-medium text-zinc-300 transition hover:bg-zinc-800"

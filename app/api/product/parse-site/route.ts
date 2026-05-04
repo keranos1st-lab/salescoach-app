@@ -1,11 +1,30 @@
-import { auth } from "@clerk/nextjs/server";
 import {
   mergeAutofillWithExisting,
   parseSiteTextToProfile,
 } from "@/lib/product-profile-autofill";
-import { createClerkSupabaseClient } from "@/lib/supabase-clerk";
+import {
+  companyProfileFromJson,
+  companyProfileToJson,
+  type CompanyProfile,
+} from "@/lib/company-profile";
+import { getAuthContext } from "@/lib/get-auth-context";
+import { prisma } from "@/lib/prisma";
 import { callWormsoftCompanyProfile, WormsoftError } from "@/lib/wormsoft-client";
 import type { CompanyProfileResponse } from "@/lib/wormsoft-types";
+
+/** Без Wormsoft: только эвристики по тексту страницы (parseSiteTextToProfile и merge). */
+const EMPTY_AI_PROFILE: CompanyProfileResponse = {
+  niche: null,
+  services: [],
+  products: [],
+  regions: [],
+  min_check: null,
+  avg_check: null,
+  priority_clients: null,
+  unique_selling_points: [],
+  upsell_services: [],
+  anti_ideal_clients: null,
+};
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -45,12 +64,13 @@ function extract(html: string, regex: RegExp) {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
+    const ctx = await getAuthContext();
+    if (!ctx?.user.companyId) {
       return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
     }
 
-    const supabase = await createClerkSupabaseClient();
+    const companyId = ctx.user.companyId;
+    const userId = ctx.user.id;
 
     const body = (await request.json()) as {
       siteUrl?: string;
@@ -140,162 +160,169 @@ ${htmlForModel}
 На основе этого заполни JSON со следующей структурой (типы полей):
 ${COMPANY_PROFILE_JSON_SCHEMA}`;
 
+    const wormsoftKey = process.env.WORMSOFT_API_KEY?.trim();
+    const useWormsoftAi =
+      Boolean(wormsoftKey) &&
+      wormsoftKey !== "test_key_for_local_development";
     let aiProfile: CompanyProfileResponse;
-    try {
-      aiProfile = await callWormsoftCompanyProfile({
-        system: SYSTEM_PARSE_SITE,
-        user: userPrompt,
-      });
-    } catch (e) {
-      if (e instanceof WormsoftError) {
-        return NextResponse.json({ error: e.message }, { status: 502 });
+
+    if (!useWormsoftAi) {
+      aiProfile = EMPTY_AI_PROFILE;
+    } else {
+      try {
+        aiProfile = await callWormsoftCompanyProfile({
+          system: SYSTEM_PARSE_SITE,
+          user: userPrompt,
+        });
+      } catch (e) {
+        if (e instanceof WormsoftError) {
+          return NextResponse.json({ error: e.message }, { status: 502 });
+        }
+        throw e;
       }
-      throw e;
     }
 
-    const { data: existingProfile } = await supabase
-      .from("company_profile")
-      .select(
-        "niche, services, products, manual_description, regions, min_check, avg_check, priority_clients, unique_selling_points, upsell_services, anti_ideal_clients"
-      )
-      .eq("user_id", userId)
-      .maybeSingle();
+    const companyRow = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { profile: true },
+    });
+    const existingSnapshot = companyProfileFromJson(
+      companyRow?.profile ?? null,
+      userId
+    );
+    const ex = existingSnapshot as Record<string, unknown>;
 
     const parsedDraft = parseSiteTextToProfile(parsedText);
     const safeAutofill = mergeAutofillWithExisting(
       {
-        niche: existingProfile?.niche ?? null,
-        services: existingProfile?.services ?? null,
-        products: existingProfile?.products ?? null,
-        manual_description: existingProfile?.manual_description ?? null,
+        niche: existingSnapshot.niche ?? null,
+        services: existingSnapshot.services ?? null,
+        products: existingSnapshot.products ?? null,
+        manual_description: existingSnapshot.manual_description ?? null,
       },
       parsedDraft
     );
 
-    const ex = existingProfile as Record<string, unknown> | null;
-
     const niche =
       aiProfile.niche ??
       safeAutofill.niche ??
-      (typeof ex?.niche === "string" ? ex.niche : null) ??
+      (typeof ex.niche === "string" ? ex.niche : null) ??
       null;
 
     const services =
       (aiProfile.services.length ? aiProfile.services : null) ??
       safeAutofill.services ??
-      (Array.isArray(ex?.services) ? (ex.services as string[]) : null) ??
+      (Array.isArray(ex.services) ? (ex.services as string[]) : null) ??
       null;
 
     const products =
       (aiProfile.products.length ? aiProfile.products : null) ??
       safeAutofill.products ??
-      (Array.isArray(ex?.products) ? (ex.products as string[]) : null) ??
+      (Array.isArray(ex.products) ? (ex.products as string[]) : null) ??
       null;
 
     const manual_description =
       safeAutofill.manual_description ??
-      (typeof ex?.manual_description === "string" ? ex.manual_description : null) ??
+      (typeof ex.manual_description === "string" ? ex.manual_description : null) ??
       null;
 
     const regions =
       (aiProfile.regions.length ? aiProfile.regions : null) ??
-      (Array.isArray(ex?.regions) ? (ex.regions as string[]) : null) ??
+      (Array.isArray(ex.regions) ? (ex.regions as string[]) : null) ??
       null;
 
     const min_check =
       aiProfile.min_check ??
-      (typeof ex?.min_check === "number" ? ex.min_check : null) ??
+      (typeof ex.min_check === "number" ? ex.min_check : null) ??
       null;
 
     const avg_check =
       aiProfile.avg_check ??
-      (typeof ex?.avg_check === "number" ? ex.avg_check : null) ??
+      (typeof ex.avg_check === "number" ? ex.avg_check : null) ??
       null;
 
     const priority_clients =
       aiProfile.priority_clients ??
-      (typeof ex?.priority_clients === "string" ? ex.priority_clients : null) ??
+      (typeof ex.priority_clients === "string" ? ex.priority_clients : null) ??
       null;
 
     const unique_selling_points =
       (aiProfile.unique_selling_points.length
         ? aiProfile.unique_selling_points
         : null) ??
-      (Array.isArray(ex?.unique_selling_points)
+      (Array.isArray(ex.unique_selling_points)
         ? (ex.unique_selling_points as string[])
         : null) ??
       null;
 
     const upsell_services =
       (aiProfile.upsell_services.length ? aiProfile.upsell_services : null) ??
-      (Array.isArray(ex?.upsell_services) ? (ex.upsell_services as string[]) : null) ??
+      (Array.isArray(ex.upsell_services) ? (ex.upsell_services as string[]) : null) ??
       null;
 
     const anti_ideal_clients =
       aiProfile.anti_ideal_clients ??
-      (typeof ex?.anti_ideal_clients === "string" ? ex.anti_ideal_clients : null) ??
+      (typeof ex.anti_ideal_clients === "string" ? ex.anti_ideal_clients : null) ??
       null;
 
-    const { error, data } = await supabase
-      .from("company_profile")
-      .upsert(
-        {
-          user_id: userId,
-          site_url: url.toString(),
-          parsed_text: parsedText,
-          niche,
-          services,
-          products,
-          manual_description,
-          regions,
-          min_check,
-          avg_check,
-          priority_clients,
-          unique_selling_points,
-          upsell_services,
-          anti_ideal_clients,
-          updated_at: new Date().toISOString(),
-        },
-        { onConflict: 'user_id' }
-      )
-      .select(
-        "site_url, parsed_text, niche, services, products, manual_description, regions, min_check, avg_check, priority_clients, unique_selling_points, upsell_services, anti_ideal_clients"
-      )
-      .single();
+    const nextProfile: CompanyProfile = {
+      ...existingSnapshot,
+      user_id: userId,
+      site_url: url.toString(),
+      parsed_text: parsedText,
+      niche,
+      services,
+      products,
+      manual_description,
+      regions,
+      min_check,
+      avg_check,
+      priority_clients,
+      unique_selling_points,
+      upsell_services,
+      anti_ideal_clients,
+      updated_at: new Date().toISOString(),
+    };
 
-    if (error) {
-      return NextResponse.json(
-        { error: error.message || "Не удалось сохранить профиль сайта" },
-        { status: 500 }
-      );
-    }
+    await prisma.company.update({
+      where: { id: companyId },
+      data: {
+        profile: companyProfileToJson(nextProfile) as object,
+      },
+    });
+
+    const data = companyProfileToJson(nextProfile);
 
     const filled: string[] = [];
     const wasEmpty = (v: unknown) =>
       v == null || (typeof v === "string" && !v.trim()) || (Array.isArray(v) && !v.length);
 
-    if (wasEmpty(existingProfile?.niche) && niche) filled.push("niche");
-    if (wasEmpty(existingProfile?.services) && services?.length) filled.push("services");
-    if (wasEmpty(existingProfile?.products) && products?.length) filled.push("products");
-    if (wasEmpty(existingProfile?.manual_description) && manual_description) {
+    if (wasEmpty(existingSnapshot.niche) && niche) filled.push("niche");
+    if (wasEmpty(existingSnapshot.services) && services?.length)
+      filled.push("services");
+    if (wasEmpty(existingSnapshot.products) && products?.length)
+      filled.push("products");
+    if (wasEmpty(existingSnapshot.manual_description) && manual_description) {
       filled.push("manual_description");
     }
-    if (wasEmpty(existingProfile?.regions) && regions?.length) filled.push("regions");
-    if (existingProfile?.min_check == null && min_check != null) filled.push("min_check");
-    if (existingProfile?.avg_check == null && avg_check != null) filled.push("avg_check");
-    if (wasEmpty(existingProfile?.priority_clients) && priority_clients) {
+    if (wasEmpty(existingSnapshot.regions) && regions?.length) filled.push("regions");
+    if (existingSnapshot.min_check == null && min_check != null)
+      filled.push("min_check");
+    if (existingSnapshot.avg_check == null && avg_check != null)
+      filled.push("avg_check");
+    if (wasEmpty(existingSnapshot.priority_clients) && priority_clients) {
       filled.push("priority_clients");
     }
     if (
-      wasEmpty(existingProfile?.unique_selling_points) &&
+      wasEmpty(existingSnapshot.unique_selling_points) &&
       unique_selling_points?.length
     ) {
       filled.push("unique_selling_points");
     }
-    if (wasEmpty(existingProfile?.upsell_services) && upsell_services?.length) {
+    if (wasEmpty(existingSnapshot.upsell_services) && upsell_services?.length) {
       filled.push("upsell_services");
     }
-    if (wasEmpty(existingProfile?.anti_ideal_clients) && anti_ideal_clients) {
+    if (wasEmpty(existingSnapshot.anti_ideal_clients) && anti_ideal_clients) {
       filled.push("anti_ideal_clients");
     }
 

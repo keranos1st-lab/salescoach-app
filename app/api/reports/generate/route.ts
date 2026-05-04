@@ -1,5 +1,5 @@
-import { auth } from "@clerk/nextjs/server";
-import { createClerkSupabaseClient } from "@/lib/supabase-clerk";
+import { getAuthContext } from "@/lib/get-auth-context";
+import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
 
@@ -354,14 +354,14 @@ function providerErrorDetails(error: unknown): {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
+    const ctx = await getAuthContext();
+    if (!ctx?.user.companyId) {
       return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
     }
 
-    const apiKey = process.env.OPENAI_API_KEY?.trim();
+    const companyId = ctx.user.companyId;
 
-    const supabase = await createClerkSupabaseClient();
+    const apiKey = process.env.OPENAI_API_KEY?.trim();
 
     const body = (await request.json()) as {
       managerId?: string;
@@ -384,12 +384,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Некорректный диапазон дат" }, { status: 400 });
     }
 
-    const { data: manager } = await supabase
-      .from("managers")
-      .select("id, name")
-      .eq("id", managerId)
-      .eq("user_id", userId)
-      .maybeSingle();
+    const manager = await prisma.manager.findFirst({
+      where: { id: managerId, companyId, isActive: true },
+      select: { id: true, name: true },
+    });
 
     if (!manager) {
       return NextResponse.json(
@@ -398,15 +396,25 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const { data: callsRaw } = await supabase
-      .from("calls")
-      .select("score, positives, negatives, created_at")
-      .eq("manager_id", managerId)
-      .gte("created_at", normalizeDate(from, false))
-      .lte("created_at", normalizeDate(to, true))
-      .order("created_at", { ascending: true });
+    const fromDate = new Date(normalizeDate(from, false));
+    const toDate = new Date(normalizeDate(to, true));
 
-    const calls = callsRaw ?? [];
+    const callsRaw = await prisma.call.findMany({
+      where: {
+        companyId,
+        managerId,
+        createdAt: { gte: fromDate, lte: toDate },
+      },
+      orderBy: { createdAt: "asc" },
+      select: { score: true, transcript: true, createdAt: true },
+    });
+
+    const calls = callsRaw.map((c) => ({
+      score: c.score,
+      positives: [] as string[],
+      negatives: [] as string[],
+      created_at: c.createdAt.toISOString(),
+    }));
 
     const scores = calls
       .map((c) => c.score)

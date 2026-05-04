@@ -1,43 +1,43 @@
 import { AppShell } from "@/components/app-shell";
-import { createClerkSupabaseClient } from "@/lib/supabase-clerk";
-import { ScoreTrendChart } from "@/app/dashboard/score-trend-chart";
-import { auth } from "@clerk/nextjs/server";
+import { ScoreTrendChart } from "./score-trend-chart";
+import { getAuthContext } from "@/lib/get-auth-context";
+import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export default async function DashboardPage() {
-  const { userId } = await auth();
-  if (!userId) {
+  const ctx = await getAuthContext();
+
+  console.log("[DASHBOARD] Auth context:", {
+    userId: ctx?.user?.id,
+    email: ctx?.user?.email,
+    companyId: ctx?.user?.companyId,
+    companyName: ctx?.user?.company?.name,
+    hasSubscription: !!ctx?.subscription,
+    managersCount: ctx?.managers?.length,
+  });
+
+  // дальше обычный код страницы
+  if (!ctx) {
+    redirect("/login");
+  }
+  const companyId = ctx.user.companyId;
+  if (!companyId) {
     redirect("/login");
   }
 
-  const supabase = await createClerkSupabaseClient();
-
-  const { data: callsRaw } = await supabase
-    .from("calls")
-    .select("created_at, score, managers ( id, name )")
-    .order("created_at", { ascending: true });
-
-  const calls = (callsRaw ?? []).map((row) => {
-    const r = row as {
-      created_at: string;
-      score: number | null;
-      managers?: { id: string; name: string } | { id: string; name: string }[] | null;
-    };
-    const managerValue = r.managers;
-    const manager =
-      managerValue == null
-        ? null
-        : Array.isArray(managerValue)
-          ? managerValue[0] ?? null
-          : managerValue;
-    return {
-      created_at: r.created_at,
-      score: r.score,
-      managerId: manager?.id ?? "no-manager",
-      managerName: manager?.name ?? "Без менеджера",
-    };
+  const callsRaw = await prisma.call.findMany({
+    where: { companyId },
+    include: { manager: { select: { id: true, name: true } } },
+    orderBy: { createdAt: "asc" },
   });
+
+  const calls = callsRaw.map((row) => ({
+    created_at: row.createdAt.toISOString(),
+    score: row.score,
+    managerId: row.manager?.id ?? "no-manager",
+    managerName: row.manager?.name ?? "Без менеджера",
+  }));
 
   const managerStatsMap = new Map<
     string,

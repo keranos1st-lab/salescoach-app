@@ -1,10 +1,11 @@
-import { auth } from "@clerk/nextjs/server";
 import { buildProductCallSignals } from "@/lib/call-analysis-product-layer";
 import {
-  rowToCompanyProfile,
+  companyProfileFromJson,
   type CompanyProfile,
 } from "@/lib/company-profile";
-import { createClerkSupabaseClient } from "@/lib/supabase-clerk";
+import { getAuthContext } from "@/lib/get-auth-context";
+import { prisma } from "@/lib/prisma";
+import { createSupabaseServiceClient } from "@/lib/supabase-service";
 import {
   callWormsoftCallAnalysis,
   WormsoftError,
@@ -129,12 +130,24 @@ ${CALL_ANALYSIS_JSON_SCHEMA}
 Не выдумывай факты, которых нет в транскрипте, и обязательно придерживайся границ 0–10 для оценок.`;
 }
 
+async function assemblyAiResponseJson<T>(response: Response): Promise<T> {
+  if (!response.ok) {
+    const errorText = await response.text();
+    throw new Error(
+      `AssemblyAI error: ${errorText.trim() || response.statusText}`
+    );
+  }
+  return (await response.json()) as T;
+}
+
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
+    const ctx = await getAuthContext();
+    if (!ctx?.user.companyId) {
       return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
     }
+    const userId = ctx.user.id;
+    const companyId = ctx.user.companyId;
 
     const contentType = request.headers.get("content-type") ?? "";
 
@@ -146,8 +159,6 @@ export async function POST(request: NextRequest) {
           { status: 500 }
         );
       }
-
-      const supabase = await createClerkSupabaseClient();
 
       const body = (await request.json()) as { transcript?: string };
       const transcript =
@@ -162,15 +173,12 @@ export async function POST(request: NextRequest) {
       const transcriptForModel =
         transcript.length > 48_000 ? transcript.slice(0, 48_000) : transcript;
 
-      const { data: companyProfileRow } = await supabase
-        .from("company_profile")
-        .select(
-          "id, user_id, site_url, parsed_text, manual_description, niche, services, products, regions, min_check, avg_check, priority_clients, unique_selling_points, upsell_services, anti_ideal_clients, updated_at"
-        )
-        .eq("user_id", userId)
-        .maybeSingle();
-      const companyProfile = companyProfileRow
-        ? rowToCompanyProfile(companyProfileRow as Record<string, unknown>, userId)
+      const companyRow = await prisma.company.findUnique({
+        where: { id: companyId },
+        select: { profile: true },
+      });
+      const companyProfile: CompanyProfile | null = companyRow?.profile
+        ? companyProfileFromJson(companyRow.profile, userId)
         : null;
 
       try {
@@ -195,7 +203,22 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const supabase = await createClerkSupabaseClient();
+    console.log("[calls/analyze] supabase env (no secrets)", {
+      hasNextPublicSupabaseUrl: Boolean(
+        process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+      ),
+      hasSupabaseServiceRoleKey: Boolean(
+        process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+      ),
+      supabaseStorageCallsBucket:
+        process.env.SUPABASE_STORAGE_CALLS_BUCKET?.trim() || "calls",
+    });
+    console.log(
+      "[calls/analyze] SUPABASE_STORAGE_CALLS_BUCKET JSON:",
+      JSON.stringify(process.env.SUPABASE_STORAGE_CALLS_BUCKET ?? null)
+    );
+
+    const supabase = createSupabaseServiceClient();
 
     const requestFormData = await request.formData();
     const file = requestFormData.get("file");
@@ -213,29 +236,28 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Файл больше 25 МБ" }, { status: 400 });
     }
 
-    const { data: manager, error: mgrErr } = await supabase
-      .from("managers")
-      .select("id")
-      .eq("id", managerId)
-      .eq("user_id", userId)
-      .maybeSingle();
+    const manager = await prisma.manager.findFirst({
+      where: {
+        id: managerId,
+        companyId,
+        isActive: true,
+      },
+      select: { id: true },
+    });
 
-    if (mgrErr || !manager) {
+    if (!manager) {
       return NextResponse.json(
         { error: "Менеджер не найден или нет доступа" },
         { status: 403 }
       );
     }
 
-    const { data: companyProfileRow } = await supabase
-      .from("company_profile")
-      .select(
-        "id, user_id, site_url, parsed_text, manual_description, niche, services, products, regions, min_check, avg_check, priority_clients, unique_selling_points, upsell_services, anti_ideal_clients, updated_at"
-      )
-      .eq("user_id", userId)
-      .maybeSingle();
-    const companyProfile = companyProfileRow
-      ? rowToCompanyProfile(companyProfileRow as Record<string, unknown>, userId)
+    const companyRow = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { profile: true },
+    });
+    const companyProfile: CompanyProfile | null = companyRow?.profile
+      ? companyProfileFromJson(companyRow.profile, userId)
       : null;
 
     const origName = file.name || "recording.webm";
@@ -247,12 +269,25 @@ export async function POST(request: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // Storage bucket `calls-audio`: клиент из createClerkSupabaseClient() (JWT Clerk в Authorization).
-    const bucketId = "calls-audio";
-    const { error: uploadErr } = await supabase.storage.from(bucketId).upload(finalPath, buffer, {
-      contentType: file.type || "application/octet-stream",
-      upsert: false,
-    });
+    // Storage: серверный клиент с SUPABASE_SERVICE_ROLE_KEY (обходит Storage RLS).
+    const bucketId =
+      process.env.SUPABASE_STORAGE_CALLS_BUCKET?.trim() || "calls";
+    let uploadErr;
+    try {
+      const uploadResult = await supabase.storage.from(bucketId).upload(finalPath, buffer, {
+        contentType: file.type || "application/octet-stream",
+        upsert: false,
+      });
+      uploadErr = uploadResult.error;
+    } catch (error) {
+      console.error("[storage upload thrown]", {
+        "error instanceof Error": error instanceof Error,
+        name: error instanceof Error ? error.name : undefined,
+        message: error instanceof Error ? error.message : String(error),
+        cause: error instanceof Error ? error.cause : undefined,
+      });
+      throw error;
+    }
 
     if (uploadErr) {
       const httpStatusFromErr =
@@ -288,6 +323,11 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: errMessage }, { status: httpStatus });
     }
 
+    console.log("[calls/analyze] assemblyai env", {
+      hasKey: Boolean(process.env.ASSEMBLYAI_API_KEY?.trim()),
+      keyLength: process.env.ASSEMBLYAI_API_KEY?.trim()?.length ?? 0,
+    });
+
     const assemblyApiKey = process.env.ASSEMBLYAI_API_KEY?.trim();
     if (!assemblyApiKey) {
       return NextResponse.json(
@@ -305,16 +345,16 @@ export async function POST(request: NextRequest) {
       },
       body: audioBuffer,
     });
-    const uploadJson = (await uploadRes.json()) as {
+    const uploadJson = await assemblyAiResponseJson<{
       upload_url?: string;
       error?: string;
-    };
+    }>(uploadRes);
     const uploadUrl = uploadJson.upload_url;
-    if (!uploadRes.ok || !uploadUrl) {
+    if (!uploadUrl) {
       return NextResponse.json(
         {
           error:
-            uploadJson.error || uploadRes.statusText || "AssemblyAI upload failed",
+            uploadJson.error || "AssemblyAI upload: нет upload_url в ответе",
         },
         { status: 500 }
       );
@@ -332,18 +372,17 @@ export async function POST(request: NextRequest) {
         speech_models: ["universal-2"],
       }),
     });
-    const transcriptCreateJson = (await transcriptRes.json()) as {
+    const transcriptCreateJson = await assemblyAiResponseJson<{
       id?: string;
       error?: string;
-    };
+    }>(transcriptRes);
     const transcriptId = transcriptCreateJson.id;
-    if (!transcriptRes.ok || !transcriptId) {
+    if (!transcriptId) {
       return NextResponse.json(
         {
           error:
             transcriptCreateJson.error ||
-            transcriptRes.statusText ||
-            "AssemblyAI transcript create failed",
+            "AssemblyAI: в ответе нет id транскрипта",
         },
         { status: 500 }
       );
@@ -358,11 +397,11 @@ export async function POST(request: NextRequest) {
           headers: { authorization: assemblyApiKey },
         }
       );
-      const pollData = (await pollRes.json()) as {
+      const pollData = await assemblyAiResponseJson<{
         status?: string;
         text?: string;
         error?: string;
-      };
+      }>(pollRes);
       if (pollData.status === "completed") {
         transcript = pollData.text ?? "";
         break;
@@ -392,24 +431,18 @@ export async function POST(request: NextRequest) {
 
     const analysis = mapCallAnalysisToExtended(worm, productSignals);
 
-    const { data: callRow, error: insertErr } = await supabase
-      .from("calls")
-      .insert({
-        user_id: userId,
-        manager_id: managerId,
-        audio_url: finalPath,
-        transcript: transcriptText,
-        score: analysis.score,
-        positives: analysis.positives,
-        negatives: analysis.negatives,
-        next_task: analysis.next_task || null,
-      })
-      .select(
-        "id, score, positives, negatives, next_task, transcript, created_at, audio_url"
-      )
-      .single();
-
-    if (insertErr || !callRow) {
+    let callRow;
+    try {
+      callRow = await prisma.call.create({
+        data: {
+          companyId,
+          managerId,
+          audioUrl: finalPath,
+          transcript: transcriptText,
+          score: analysis.score,
+        },
+      });
+    } catch (insertErr) {
       console.error(insertErr);
       return NextResponse.json(
         { error: "Не удалось сохранить звонок в базу" },
@@ -418,7 +451,16 @@ export async function POST(request: NextRequest) {
     }
 
     return NextResponse.json({
-      call: callRow,
+      call: {
+        id: callRow.id,
+        score: callRow.score,
+        positives: analysis.positives,
+        negatives: analysis.negatives,
+        next_task: analysis.next_task,
+        transcript: callRow.transcript,
+        created_at: callRow.createdAt.toISOString(),
+        audio_url: callRow.audioUrl,
+      },
       analysis,
     });
   } catch (e) {

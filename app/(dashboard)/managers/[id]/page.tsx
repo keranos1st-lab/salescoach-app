@@ -1,7 +1,7 @@
 import { AppShell } from "@/components/app-shell";
-import { ScoreTrendChart } from "@/app/dashboard/score-trend-chart";
-import { createClerkSupabaseClient } from "@/lib/supabase-clerk";
-import { auth } from "@clerk/nextjs/server";
+import { ScoreTrendChart } from "@/app/(dashboard)/dashboard/score-trend-chart";
+import { getAuthContext } from "@/lib/get-auth-context";
+import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 
@@ -25,41 +25,43 @@ function scoreColor(score: number | null) {
 
 export default async function ManagerDetailsPage(props: PageProps) {
   const { id } = await props.params;
-  const { userId } = await auth();
-  if (!userId) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
+    redirect("/login");
+  }
+  const companyId = ctx.user.companyId;
+  if (!companyId) {
     redirect("/login");
   }
 
-  const supabase = await createClerkSupabaseClient();
-
-  const { data: managerRaw } = await supabase
-    .from("managers")
-    .select("id, name")
-    .eq("id", id)
-    .eq("user_id", userId)
-    .maybeSingle();
+  const managerRaw = await prisma.manager.findFirst({
+    where: { id, companyId, isActive: true },
+    select: { id: true, name: true },
+  });
 
   if (!managerRaw) {
     notFound();
   }
 
-  const { data: callsRaw } = await supabase
-    .from("calls")
-    .select("id, created_at, score, next_task")
-    .eq("manager_id", id)
-    .order("created_at", { ascending: false });
+  const callsRaw = await prisma.call.findMany({
+    where: { companyId, managerId: id },
+    select: { id: true, createdAt: true, score: true },
+    orderBy: { createdAt: "desc" },
+  });
 
-  const calls: CallRow[] = (callsRaw ?? []).map((row) => ({
-    id: String(row.id),
-    created_at: String(row.created_at),
+  const calls: CallRow[] = callsRaw.map((row) => ({
+    id: row.id,
+    created_at: row.createdAt.toISOString(),
     score: row.score ?? null,
-    next_task: row.next_task ?? null,
+    next_task: null,
   }));
 
   const scored = calls.filter((c) => typeof c.score === "number");
   const avgScore =
     scored.length > 0
-      ? Number((scored.reduce((sum, c) => sum + (c.score ?? 0), 0) / scored.length).toFixed(1))
+      ? Number(
+          (scored.reduce((sum, c) => sum + (c.score ?? 0), 0) / scored.length).toFixed(1)
+        )
       : null;
 
   const trendMap = new Map<string, { sum: number; count: number }>();
@@ -91,7 +93,11 @@ export default async function ManagerDetailsPage(props: PageProps) {
 
           <section className="grid gap-4 sm:grid-cols-3">
             <MetricCard title="Звонков" value={calls.length} />
-            <MetricCard title="Средний балл" value={avgScore == null ? "—" : avgScore} valueClass={scoreColor(avgScore)} />
+            <MetricCard
+              title="Средний балл"
+              value={avgScore == null ? "—" : avgScore}
+              valueClass={scoreColor(avgScore)}
+            />
             <MetricCard title="Звонков с оценкой" value={scored.length} />
           </section>
 

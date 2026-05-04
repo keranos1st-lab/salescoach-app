@@ -80,3 +80,51 @@ export function rowToCompanyProfile(
     updated_at: row.updated_at != null ? String(row.updated_at) : null,
   };
 }
+
+/** Снимок профиля в `Company.profile` (JSONB). */
+export type CompanyProfileJson = {
+  site_url?: string | null;
+  parsed_text?: string | null;
+  manual_description?: string | null;
+  niche?: string | null;
+  services?: string[] | null;
+  products?: string[] | null;
+  regions?: string[] | null;
+  min_check?: number | null;
+  avg_check?: number | null;
+  priority_clients?: string | null;
+  unique_selling_points?: string[] | null;
+  upsell_services?: string[] | null;
+  anti_ideal_clients?: string | null;
+  updated_at?: string | null;
+};
+
+export function companyProfileFromJson(
+  value: unknown,
+  userId: string
+): CompanyProfile {
+  const row =
+    value != null && typeof value === "object" && !Array.isArray(value)
+      ? (value as Record<string, unknown>)
+      : {};
+  return rowToCompanyProfile(row, userId);
+}
+
+export function companyProfileToJson(profile: CompanyProfile): CompanyProfileJson {
+  return {
+    site_url: profile.site_url,
+    parsed_text: profile.parsed_text,
+    manual_description: profile.manual_description,
+    niche: profile.niche,
+    services: profile.services,
+    products: profile.products,
+    regions: profile.regions,
+    min_check: profile.min_check,
+    avg_check: profile.avg_check,
+    priority_clients: profile.priority_clients,
+    unique_selling_points: profile.unique_selling_points,
+    upsell_services: profile.upsell_services,
+    anti_ideal_clients: profile.anti_ideal_clients,
+    updated_at: profile.updated_at,
+  };
+}

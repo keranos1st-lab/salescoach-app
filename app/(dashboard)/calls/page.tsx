@@ -1,67 +1,61 @@
-import { CallsWorkspace, type CallListItem } from "@/app/calls/calls-workspace";
+import { CallsWorkspace, type CallListItem } from "./calls-workspace";
 import { AppShell } from "@/components/app-shell";
-import { createClerkSupabaseClient } from "@/lib/supabase-clerk";
-import { auth } from "@clerk/nextjs/server";
+import { companyProfileFromJson } from "@/lib/company-profile";
+import { getAuthContext } from "@/lib/get-auth-context";
+import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export default async function CallsPage() {
-  const { userId } = await auth();
-  if (!userId) {
+  const ctx = await getAuthContext();
+  if (!ctx) {
     redirect("/login");
   }
+  const companyId = ctx.user.companyId;
+  if (!companyId) {
+    redirect("/login");
+  }
+  const userId = ctx.user.id;
 
-  const supabase = await createClerkSupabaseClient();
+  const managers = await prisma.manager.findMany({
+    where: { companyId, isActive: true },
+    select: { id: true, name: true },
+    orderBy: { name: "asc" },
+  });
 
-  const { data: managers } = await supabase
-    .from("managers")
-    .select("id, name")
-    .order("name", { ascending: true });
+  const callsRaw = await prisma.call.findMany({
+    where: { companyId },
+    include: { manager: { select: { name: true } } },
+    orderBy: { createdAt: "desc" },
+  });
 
-  const { data: callsRaw } = await supabase
-    .from("calls")
-    .select(
-      "id, created_at, score, transcript, positives, negatives, next_task, audio_url, managers!inner ( name )"
-    )
-    .order("created_at", { ascending: false });
-
-  const { data: companyProfile } = await supabase
-    .from("company_profile")
-    .select("manual_description, parsed_text")
-    .eq("user_id", userId)
-    .maybeSingle();
+  const company = await prisma.company.findUnique({
+    where: { id: companyId },
+    select: { profile: true },
+  });
+  const profile = company?.profile
+    ? companyProfileFromJson(company.profile, userId)
+    : null;
   const productContext =
-    companyProfile?.manual_description?.trim() ||
-    companyProfile?.parsed_text?.trim() ||
+    profile?.manual_description?.trim() ||
+    profile?.parsed_text?.trim() ||
     "";
   const contextPreview =
     productContext.length > 100
       ? `${productContext.slice(0, 100).trim()}...`
       : productContext;
 
-  const initialCalls: CallListItem[] = (callsRaw ?? []).map((row) => {
-    const r = row as unknown as CallListItem & {
-      managers?: { name: string } | { name: string }[] | null;
-    };
-    const m = r.managers;
-    const manager =
-      m == null
-        ? null
-        : Array.isArray(m)
-          ? m[0] ?? null
-          : m;
-    return {
-      id: r.id,
-      created_at: r.created_at,
-      score: r.score,
-      transcript: r.transcript,
-      positives: r.positives,
-      negatives: r.negatives,
-      next_task: r.next_task,
-      audio_url: r.audio_url,
-      managers: manager,
-    };
-  });
+  const initialCalls: CallListItem[] = callsRaw.map((row) => ({
+    id: row.id,
+    created_at: row.createdAt.toISOString(),
+    score: row.score,
+    transcript: row.transcript,
+    positives: null,
+    negatives: null,
+    next_task: null,
+    audio_url: row.audioUrl,
+    managers: row.manager ? { name: row.manager.name } : null,
+  }));
 
   return (
     <AppShell activeHref="/calls">
@@ -99,7 +93,7 @@ export default async function CallsPage() {
           )}
         </section>
         <CallsWorkspace
-          managers={managers ?? []}
+          managers={managers}
           initialCalls={initialCalls}
         />
       </main>

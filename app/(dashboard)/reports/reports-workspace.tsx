@@ -1,7 +1,7 @@
 "use client";
 
 import { useMemo, useRef, useState } from "react";
-import type { ReportManager } from "@/app/reports/page";
+import type { ReportManager } from "./page";
 
 type RangePreset = "week" | "month" | "custom";
 

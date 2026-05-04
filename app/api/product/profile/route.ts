@@ -1,9 +1,14 @@
-import { auth } from "@clerk/nextjs/server";
+import { getAuthContext } from "@/lib/get-auth-context";
+import {
+  companyProfileFromJson,
+  companyProfileToJson,
+  type CompanyProfile,
+} from "@/lib/company-profile";
 import {
   mergeAutofillWithExisting,
   parseSiteTextToProfile,
 } from "@/lib/product-profile-autofill";
-import { createClerkSupabaseClient } from "@/lib/supabase-clerk";
+import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -16,12 +21,13 @@ function parseOptionalInt(v: unknown): number | null {
 
 export async function POST(request: NextRequest) {
   try {
-    const { userId } = await auth();
-    if (!userId) {
+    const ctx = await getAuthContext();
+    if (!ctx?.user.companyId) {
       return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
     }
 
-    const supabase = await createClerkSupabaseClient();
+    const companyId = ctx.user.companyId;
+    const userId = ctx.user.id;
 
     const body = (await request.json()) as {
       siteUrl?: string | null;
@@ -53,15 +59,20 @@ export async function POST(request: NextRequest) {
     const unique_selling_points = body.uniqueSellingPoints?.length
       ? body.uniqueSellingPoints
       : null;
-    const upsell_services = body.upsellServices?.length ? body.upsellServices : null;
+    const upsell_services = body.upsellServices?.length
+      ? body.upsellServices
+      : null;
     const anti_ideal_clients = body.antiIdealClients?.trim() || null;
     const autoParse = body.autoParse === true;
 
-    const { data: existingProfile } = await supabase
-      .from("company_profile")
-      .select("niche, services, products, manual_description")
-      .eq("user_id", userId)
-      .maybeSingle();
+    const companyRow = await prisma.company.findUnique({
+      where: { id: companyId },
+      select: { profile: true },
+    });
+    const existingProfile = companyProfileFromJson(
+      companyRow?.profile ?? null,
+      userId
+    );
 
     let mergedNiche = niche;
     let mergedServices = services;
@@ -72,11 +83,11 @@ export async function POST(request: NextRequest) {
       const parsedDraft = parseSiteTextToProfile(parsedText);
       const safeAutofill = mergeAutofillWithExisting(
         {
-          niche: niche ?? existingProfile?.niche ?? null,
-          services: services ?? existingProfile?.services ?? null,
-          products: products ?? existingProfile?.products ?? null,
+          niche: niche ?? existingProfile.niche ?? null,
+          services: services ?? existingProfile.services ?? null,
+          products: products ?? existingProfile.products ?? null,
           manual_description:
-            manualDescription ?? existingProfile?.manual_description ?? null,
+            manualDescription ?? existingProfile.manual_description ?? null,
         },
         parsedDraft
       );
@@ -84,36 +95,35 @@ export async function POST(request: NextRequest) {
       mergedNiche = niche ?? safeAutofill.niche;
       mergedServices = services ?? safeAutofill.services;
       mergedProducts = products ?? safeAutofill.products;
-      mergedManualDescription = manualDescription ?? safeAutofill.manual_description;
+      mergedManualDescription =
+        manualDescription ?? safeAutofill.manual_description;
     }
 
-    const { error } = await supabase.from("company_profile").upsert(
-      {
-        user_id: userId,
-        site_url: siteUrl,
-        parsed_text: parsedText,
-        manual_description: mergedManualDescription,
-        niche: mergedNiche,
-        services: mergedServices,
-        products: mergedProducts,
-        regions,
-        min_check,
-        avg_check,
-        priority_clients,
-        unique_selling_points,
-        upsell_services,
-        anti_ideal_clients,
-        updated_at: new Date().toISOString(),
+    const nextProfile: CompanyProfile = {
+      ...existingProfile,
+      user_id: userId,
+      site_url: siteUrl,
+      parsed_text: parsedText,
+      manual_description: mergedManualDescription,
+      niche: mergedNiche,
+      services: mergedServices,
+      products: mergedProducts,
+      regions,
+      min_check,
+      avg_check,
+      priority_clients,
+      unique_selling_points,
+      upsell_services,
+      anti_ideal_clients,
+      updated_at: new Date().toISOString(),
+    };
+
+    await prisma.company.update({
+      where: { id: companyId },
+      data: {
+        profile: companyProfileToJson(nextProfile) as object,
       },
-      { onConflict: 'user_id' }
-    );
-
-    if (error) {
-      return NextResponse.json(
-        { error: error.message || "Не удалось сохранить профиль" },
-        { status: 500 }
-      );
-    }
+    });
 
     return NextResponse.json({ ok: true });
   } catch (error) {

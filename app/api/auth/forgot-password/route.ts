@@ -16,8 +16,12 @@ export async function POST(req: Request) {
     const token = crypto.randomBytes(32).toString("hex");
     const expiresAt = new Date(Date.now() + 1000 * 60 * 60);
 
-    await prisma.passwordResetToken.deleteMany({ where: { email } });
-    await prisma.passwordResetToken.create({ data: { email, token, expiresAt } });
+    await prisma.verificationToken.deleteMany({
+      where: { identifier: email },
+    });
+    await prisma.verificationToken.create({
+      data: { identifier: email, token, expires: expiresAt },
+    });
 
     if (!process.env.RESEND_API_KEY) {
       return NextResponse.json({ error: "RESEND_API_KEY is missing" }, { status: 500 });

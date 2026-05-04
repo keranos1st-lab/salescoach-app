@@ -1,85 +1,140 @@
 generator client {
-  provider        = "prisma-client-js"
-  previewFeatures = ["multiSchema"]
+  provider = "prisma-client-js"
 }
 
 datasource db {
   provider  = "postgresql"
   url       = env("DATABASE_URL")
   directUrl = env("DIRECT_URL")
-  schemas   = ["public"]
 }
 
 model User {
-  id              String           @id @default(cuid())
-  name            String?
-  email           String           @unique
-  password        String?
-  role            String           @default("user")
-  plan            String           @default("free")
-  createdAt       DateTime         @default(now())
-  managers        managers[]
-  company_profile company_profile?
-
-  @@schema("public")
+  id            String    @id @default(cuid())
+  email         String    @unique
+  name          String?
+  passwordHash  String?
+  role          Role      @default(OWNER)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+  company       Company?  @relation(fields: [companyId], references: [id])
+  companyId     String?
+  managedIn     Manager[]
+  subscription  Subscription?
+  accounts      Account[]
+  sessions      Session[]
 }
 
-model PasswordResetToken {
-  id        String   @id @default(cuid())
-  email     String
-  token     String   @unique
-  expiresAt DateTime
-  createdAt DateTime @default(now())
-
-  @@schema("public")
+enum Role {
+  OWNER
+  MANAGER
+  ADMIN
 }
 
-model managers {
-  id          String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id     String?
-  name        String
-  score_avg   Decimal?  @default(0) @db.Decimal
-  calls_count Int?      @default(0)
-  created_at  DateTime? @default(now()) @db.Timestamptz(6)
-  calls       calls[]
-  user        User?     @relation(fields: [user_id], references: [id], onDelete: Cascade)
-
-  @@schema("public")
+model Company {
+  id           String         @id @default(cuid())
+  name         String
+  profile      Json?
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @updatedAt
+  users        User[]
+  managers     Manager[]
+  calls        Call[]
+  subscription Subscription?
 }
 
-model calls {
-  id         String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  manager_id String?   @db.Uuid
-  audio_url  String?
+model Manager {
+  id           String   @id @default(cuid())
+  name         String
+  email        String?  @unique
+  passwordHash String?
+  phone        String?
+  title        String?
+  isActive     Boolean  @default(true)
+  createdAt    DateTime @default(now())
+  company      Company  @relation(fields: [companyId], references: [id])
+  companyId    String
+  user         User?    @relation(fields: [userId], references: [id])
+  userId       String?  @unique
+  calls        Call[]
+}
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  plan                 Plan      @default(TRIAL)
+  status               SubStatus @default(TRIAL)
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  stripePriceId        String?
+  currentPeriodEnd     DateTime?
+  cancelAtPeriodEnd    Boolean   @default(false)
+  yookassaPaymentId    String?
+  maxManagers          Int       @default(2)
+  maxCalls             Int       @default(20)
+  trialEndsAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  user                 User?     @relation(fields: [userId], references: [id])
+  userId               String?   @unique
+  company              Company?  @relation(fields: [companyId], references: [id])
+  companyId            String?   @unique
+}
+
+enum Plan {
+  TRIAL
+  START
+  STANDARD
+  PRO
+  BUSINESS
+}
+
+enum SubStatus {
+  TRIAL
+  ACTIVE
+  PAST_DUE
+  CANCELED
+  EXPIRED
+}
+
+model Call {
+  id         String   @id @default(cuid())
+  companyId  String
+  managerId  String?
+  audioUrl   String?
   transcript String?
   score      Int?
-  positives  Json?
-  negatives  Json?
-  next_task  String?
-  created_at DateTime? @default(now()) @db.Timestamptz(6)
-  managers   managers? @relation(fields: [manager_id], references: [id], onDelete: Cascade)
-
-  @@schema("public")
+  createdAt  DateTime @default(now())
+  company    Company  @relation(fields: [companyId], references: [id])
+  manager    Manager? @relation(fields: [managerId], references: [id])
 }
 
-model company_profile {
-  id                    String    @id @default(dbgenerated("gen_random_uuid()")) @db.Uuid
-  user_id               String    @unique
-  site_url              String?
-  parsed_text           String?
-  manual_description    String?
-  updated_at            DateTime? @default(now()) @db.Timestamptz(6)
-  niche                 String?
-  services              String[]
-  products              String[]
-  regions               String[]
-  min_check             Decimal?  @db.Decimal
-  avg_check             Decimal?  @db.Decimal
-  priority_clients      String?
-  unique_selling_points String[]
-  upsell_services       String[]
-  anti_ideal_clients    String?
-  user                  User      @relation(fields: [user_id], references: [id], onDelete: NoAction)
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+  @@unique([provider, providerAccountId])
+}
 
-  @@schema("public")
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+  @@unique([identifier, token])
 }

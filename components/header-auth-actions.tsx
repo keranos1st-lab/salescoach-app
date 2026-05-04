@@ -1,20 +1,18 @@
 import Link from "next/link";
-import { UserButton } from "@clerk/nextjs";
-import { auth, currentUser } from "@clerk/nextjs/server";
+import { getCachedSession } from "@/lib/cached-session";
 import { GuestAuthButtons } from "@/components/auth-buttons";
+import { LogoutButton } from "@/app/(dashboard)/dashboard/logout-button";
 
 export async function HeaderAuthActions() {
-  const { userId } = await auth();
+  const session = await getCachedSession();
 
-  if (!userId) {
+  if (!session?.user) {
     return <GuestAuthButtons />;
   }
 
-  const user = await currentUser();
   const label =
-    user?.firstName ||
-    user?.username ||
-    user?.primaryEmailAddress?.emailAddress ||
+    session.user.name?.trim() ||
+    session.user.email?.trim() ||
     "Профиль";
 
   return (
@@ -25,7 +23,7 @@ export async function HeaderAuthActions() {
       >
         {label}
       </Link>
-      <UserButton />
+      <LogoutButton compact />
     </div>
   );
 }
