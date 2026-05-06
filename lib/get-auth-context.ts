@@ -5,14 +5,7 @@ import { prisma } from "@/lib/prisma";
 
 export async function getAuthContext() {
   const session = await getCachedSession();
-  console.log("[getAuthContext] session", {
-    userId: session?.user?.id,
-    email: session?.user?.email,
-    role: session?.user?.role,
-    companyIdFromSession: session?.user?.companyId,
-  });
   if (!session?.user?.id) {
-    console.log("[getAuthContext] return null: no session user id");
     return null;
   }
 
@@ -31,16 +24,7 @@ export async function getAuthContext() {
         },
       },
     });
-    console.log("[getAuthContext] manager lookup", {
-      sessionUserId,
-      foundManager: !!manager,
-      managerId: manager?.id,
-      managerEmail: manager?.email,
-      managerCompanyId: manager?.companyId,
-      hasCompany: !!manager?.company,
-    });
     if (!manager?.company) {
-      console.log("[getAuthContext] return null: manager not found or no company");
       return null;
     }
 
@@ -79,17 +63,7 @@ export async function getAuthContext() {
     },
   });
 
-  console.log("[getAuthContext] user lookup", {
-    sessionUserId,
-    foundUser: !!user,
-    userId: user?.id,
-    userEmail: user?.email,
-    userRole: user?.role,
-    userCompanyId: user?.companyId,
-    hasCompany: !!user?.company,
-  });
   if (!user) {
-    console.log("[getAuthContext] return null: user not found");
     return null;
   }
 
