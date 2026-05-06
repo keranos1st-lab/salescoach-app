@@ -36,7 +36,7 @@ export async function POST(req: Request) {
       html: `
       <h2>Восстановление пароля</h2>
       <p>Вы запросили сброс пароля для аккаунта SalesCoach.</p>
-      <p><a href="${process.env.NEXTAUTH_URL}/reset-password?token=${token}" 
+      <p><a href="${process.env.NEXTAUTH_URL ?? process.env.NEXT_PUBLIC_SITE_URL}/reset-password?token=${token}" 
          style="background:#16a34a;color:white;padding:12px 24px;border-radius:6px;text-decoration:none;">
         Сбросить пароль
       </a></p>

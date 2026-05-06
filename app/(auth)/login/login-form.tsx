@@ -70,6 +70,14 @@ export function LoginForm() {
       >
         {pending ? "Вход…" : "Войти"}
       </button>
+      <div className="text-center">
+        <Link
+          href="/forgot-password"
+          className="text-sm text-zinc-500 hover:text-[#5eead4] transition-colors"
+        >
+          Забыли пароль?
+        </Link>
+      </div>
       <p className="text-center text-sm text-zinc-500">
         Нет аккаунта?{" "}
         <Link href="/register" className="text-[#5eead4] hover:underline">
