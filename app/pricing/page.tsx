@@ -1,70 +1,23 @@
+import { BuyButton } from "@/components/pricing/BuyButton";
 import { SiteFooter } from "@/components/site-footer";
+import { getAuthContext } from "@/lib/get-auth-context";
+import { PLANS, type PlanKey } from "@/lib/plans";
+import type { Plan } from "@prisma/client";
 import Link from "next/link";
 
-type Plan = {
-  name: string;
-  price: string;
-  features: string[];
-  cta: string;
-  popular?: boolean;
-};
+const PAID_PLAN_KEYS = ["STARTER", "STANDARD", "PRO", "BUSINESS"] as const satisfies readonly PlanKey[];
 
-const plans: Plan[] = [
-  {
-    name: "Старт",
-    price: "3 990 ₽/мес",
-    features: [
-      "до 20 звонков в месяц",
-      "1 менеджер",
-      "Анализ звонков с помощью ИИ",
-      "Отчёты и рекомендации",
-      "Email-поддержка",
-    ],
-    cta: "Выбрать Старт",
-  },
-  {
-    name: "Стандарт",
-    price: "7 990 ₽/мес",
-    features: [
-      "до 120 звонков в месяц",
-      "2 менеджера",
-      "Анализ звонков с помощью ИИ",
-      "Отчёты и рекомендации",
-      "Сравнение менеджеров",
-      "Email-поддержка",
-    ],
-    cta: "Выбрать Стандарт",
-    popular: true,
-  },
-  {
-    name: "Про",
-    price: "14 490 ₽/мес",
-    features: [
-      "до 450 звонков в месяц",
-      "до 5 менеджеров",
-      "Анализ звонков с помощью ИИ",
-      "Расширенная аналитика",
-      "Командные отчёты",
-      "Приоритетная поддержка",
-    ],
-    cta: "Выбрать Про",
-  },
-  {
-    name: "Бизнес",
-    price: "49 990 ₽/мес",
-    features: [
-      "Безлимитные звонки",
-      "до 15 менеджеров",
-      "Анализ звонков с помощью ИИ",
-      "Полная аналитика и дашборды",
-      "Выгрузка отчётов в Excel/PDF",
-      "Персональный менеджер",
-    ],
-    cta: "Выбрать Бизнес",
-  },
-] as const;
+function planKeyIsCurrent(planKey: PlanKey, currentPlan: Plan): boolean {
+  if (planKey === "STARTER") {
+    return currentPlan === "START";
+  }
+  return planKey === currentPlan;
+}
 
-export default function PricingPage() {
+export default async function PricingPage() {
+  const ctx = await getAuthContext();
+  const currentPlan = ctx?.subscription?.plan ?? ("TRIAL" as Plan);
+
   return (
     <main className="min-h-screen bg-zinc-950 px-4 py-14 text-zinc-100">
       <div className="mx-auto max-w-6xl">
@@ -83,46 +36,83 @@ export default function PricingPage() {
           </p>
           <p className="mt-2 text-3xl font-bold text-emerald-200">Бесплатно</p>
           <div className="mt-4 flex flex-wrap gap-3 text-sm text-emerald-100">
-            <span className="rounded-md bg-emerald-500/20 px-3 py-1">4 дня</span>
-            <span className="rounded-md bg-emerald-500/20 px-3 py-1">
-              до 20 звонков
-            </span>
-            <span className="rounded-md bg-emerald-500/20 px-3 py-1">
-              до 2 менеджеров
-            </span>
+            {PLANS.TRIAL.features.map((feature) => (
+              <span key={feature} className="rounded-md bg-emerald-500/20 px-3 py-1">
+                {feature}
+              </span>
+            ))}
           </div>
-          <button className="mt-6 rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600">
-            Начать бесплатно
-          </button>
+          {currentPlan === "TRIAL" ? (
+            <button
+              type="button"
+              disabled
+              className="mt-6 cursor-not-allowed rounded-xl bg-emerald-500/40 px-5 py-2.5 text-sm font-semibold text-emerald-100/80"
+            >
+              Текущий тариф
+            </button>
+          ) : (
+            <Link
+              href="/register"
+              className="mt-6 inline-block rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600"
+            >
+              Начать бесплатно
+            </Link>
+          )}
         </section>
 
         <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-          {plans.map((plan) => (
-            <article
-              key={plan.name}
-              className={`pricing-plan-card relative rounded-2xl border p-6 ${
-                plan.popular
-                  ? "pricing-plan-card-popular border-teal-500/60 bg-zinc-900"
-                  : "border-zinc-800 bg-zinc-900/70"
-              }`}
-            >
-              {plan.popular ? (
-                <span className="absolute right-4 top-4 rounded-full bg-teal-500/20 px-2.5 py-1 text-xs font-semibold text-teal-300">
-                  Популярный
-                </span>
-              ) : null}
-              <h2 className="text-xl font-semibold">{plan.name}</h2>
-              <p className="mt-2 text-2xl font-bold text-teal-300">{plan.price}</p>
-              <ul className="mt-5 space-y-2 text-sm text-zinc-300">
-                {plan.features.map((feature) => (
-                  <li key={feature}>• {feature}</li>
-                ))}
-              </ul>
-              <button className="mt-6 w-full rounded-xl bg-teal-600 px-4 py-2.5 text-sm font-semibold text-white transition hover:bg-teal-500">
-                {plan.cta}
-              </button>
-            </article>
-          ))}
+          {PAID_PLAN_KEYS.map((planKey) => {
+            const planDef = PLANS[planKey];
+            const isCurrent = planKeyIsCurrent(planKey, currentPlan);
+            const isPopular = planKey === "STANDARD";
+            const priceText = `${planDef.price.toLocaleString("ru-RU")} ₽/мес`;
+
+            return (
+              <article
+                key={planKey}
+                className={`pricing-plan-card relative rounded-2xl border p-6 ${
+                  isPopular
+                    ? "pricing-plan-card-popular border-teal-500/60 bg-zinc-900"
+                    : "border-zinc-800 bg-zinc-900/70"
+                }`}
+              >
+                {(isCurrent || isPopular) && (
+                  <div className="absolute right-4 top-4 flex flex-col items-end gap-1">
+                    {isCurrent ? (
+                      <span className="rounded-full bg-teal-600/30 px-2.5 py-1 text-xs font-semibold text-teal-200">
+                        Текущий
+                      </span>
+                    ) : null}
+                    {isPopular ? (
+                      <span className="rounded-full bg-teal-500/20 px-2.5 py-1 text-xs font-semibold text-teal-300">
+                        Популярный
+                      </span>
+                    ) : null}
+                  </div>
+                )}
+                <h2 className="text-xl font-semibold">{planDef.label}</h2>
+                <p className="mt-2 text-2xl font-bold text-teal-300">{priceText}</p>
+                <ul className="mt-5 space-y-2 text-sm text-zinc-300">
+                  {planDef.features.map((feature) => (
+                    <li key={feature}>• {feature}</li>
+                  ))}
+                </ul>
+                <div className="mt-6">
+                  {isCurrent ? (
+                    <button
+                      type="button"
+                      disabled
+                      className="w-full cursor-not-allowed rounded-xl bg-zinc-700 px-4 py-2.5 text-sm font-semibold text-zinc-400"
+                    >
+                      Текущий тариф
+                    </button>
+                  ) : (
+                    <BuyButton plan={planKey} />
+                  )}
+                </div>
+              </article>
+            );
+          })}
         </section>
 
         <p className="mt-8 text-center text-xs text-zinc-500">
