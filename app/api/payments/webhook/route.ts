@@ -1,9 +1,9 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
+import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
 import type { Plan } from "@prisma/client";
 
-// Маппинг UI-ключей → Prisma enum Plan
 const PLAN_TO_PRISMA: Record<string, Plan> = {
   STARTER: "START" as Plan,
   STANDARD: "STANDARD" as Plan,
@@ -13,41 +13,44 @@ const PLAN_TO_PRISMA: Record<string, Plan> = {
 
 export async function POST(req: NextRequest) {
   try {
-    const body = (await req.json()) as {
-      event?: string;
-      object?: {
-        id?: string;
-        status?: string;
-        metadata?: { userId?: string; plan?: string };
-      };
-    };
+    const text = await req.text();
+    const params = new URLSearchParams(text);
 
-    // Всегда отвечаем 200, чтобы ЮKassa не повторяла запрос
-    if (body.event !== "payment.succeeded") {
-      return NextResponse.json({ ok: true });
-    }
+    const outSum = params.get("OutSum") ?? "";
+    const invId = params.get("InvId") ?? "";
+    const signatureValue = (params.get("SignatureValue") ?? "").toLowerCase();
+    const plan = params.get("Shp_plan") ?? "";
+    const userId = params.get("Shp_userId") ?? "";
 
-    const { id: yookassaId, metadata, status } = body.object ?? {};
-    const { userId, plan } = metadata ?? {};
+    const isTest = process.env.ROBOKASSA_TEST_MODE === "true";
+    const password2 = (isTest
+      ? process.env.ROBOKASSA_TEST_PASSWORD2
+      : process.env.ROBOKASSA_PASSWORD2) ?? "";
 
-    if (!userId || !plan || !yookassaId) {
-      console.error("[webhook] missing fields", { userId, plan, yookassaId });
-      return NextResponse.json({ ok: true });
+    // Проверка подписи: MD5(OutSum:InvId:Password2:Shp_plan=...:Shp_userId=...)
+    const expected = createHash("md5")
+      .update(`${outSum}:${invId}:${password2}:Shp_plan=${plan}:Shp_userId=${userId}`)
+      .digest("hex")
+      .toLowerCase();
+
+    if (expected !== signatureValue) {
+      console.error("[webhook] invalid signature", { expected, signatureValue });
+      return new Response("bad sign", { status: 400 });
     }
 
     const prismaPlan = PLAN_TO_PRISMA[plan];
     if (!prismaPlan) {
       console.error("[webhook] unknown plan", plan);
-      return NextResponse.json({ ok: true });
+      return new Response("OK", { status: 200 });
     }
 
-    // Обновляем статус платежа
+    // Обновляем статус платежа в БД
     await prisma.payment.update({
-      where: { yookassaId },
-      data: { status: status ?? "succeeded" },
+      where: { yookassaId: invId },
+      data: { status: "succeeded" },
     });
 
-    // Активируем тариф пользователю
+    // Активируем подписку
     const user = await prisma.user.findUnique({
       where: { id: userId },
       select: { companyId: true },
@@ -68,11 +71,10 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    console.log("[webhook] subscription updated", { userId, plan, prismaPlan });
-    return NextResponse.json({ ok: true });
+    // Robokassa ожидает ответ "OK{InvId}"
+    return new Response(`OK${invId}`, { status: 200 });
   } catch (error) {
     console.error("[webhook] error", error);
-    // Важно: возвращаем 200 даже при ошибке, чтобы ЮKassa не спамила повторами
-    return NextResponse.json({ ok: true });
+    return new Response("OK", { status: 200 });
   }
 }
