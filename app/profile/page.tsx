@@ -1,3 +1,5 @@
+import { Suspense } from "react";
+import { PaymentToast } from "@/components/profile/PaymentToast";
 import { ProfileForm } from "@/components/profile/ProfileForm";
 import { getAuthContext } from "@/lib/get-auth-context";
 import { PLANS, type PlanKey } from "@/lib/plans";
@@ -110,6 +112,9 @@ export default async function ProfilePage() {
           </Link>
         </section>
       </div>
+      <Suspense fallback={null}>
+        <PaymentToast />
+      </Suspense>
     </main>
   );
 }

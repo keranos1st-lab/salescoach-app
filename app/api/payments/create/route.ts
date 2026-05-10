@@ -60,12 +60,15 @@ export async function POST(req: Request) {
       .update(`${login}:${amount}:${invId}:${password1}:Shp_plan=${plan}:Shp_userId=${userId}`)
       .digest("hex");
 
+    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://saleschek.ru";
+
     const params = new URLSearchParams({
       MerchantLogin: login,
       OutSum: amount,
       InvId: String(invId),
       Description: `Тариф ${plan} — saleschek.ru`,
       SignatureValue: signature,
+      ReturnUrl: `${appUrl}/profile?payment=success`,
       Shp_plan: plan,
       Shp_userId: userId,
       ...(isTest ? { IsTest: "1" } : {}),
