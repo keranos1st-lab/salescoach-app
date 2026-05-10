@@ -45,6 +45,7 @@ export async function POST(req: Request) {
           passwordHash: hashed,
           role: Role.OWNER,
           companyId: company.id,
+          trialEndsAt: new Date(Date.now() + 4 * 24 * 60 * 60 * 1000),
         },
       });
       const subscription = await tx.subscription.create({
