@@ -32,12 +32,17 @@ export const authOptions: NextAuthOptions = {
               name: user.name,
               role: user.role,
               companyId: user.companyId ?? "",
+              subscriptionStatus: user.subscriptionStatus,
+              trialEndsAt: user.trialEndsAt,
             } satisfies NextAuthUser & { companyId: string };
           }
         }
 
         const manager = await prisma.manager.findUnique({
           where: { email: credentials.email },
+          include: {
+            company: { include: { subscription: true } },
+          },
         });
 
         if (
@@ -51,12 +56,24 @@ export const authOptions: NextAuthOptions = {
             manager.passwordHash
           );
           if (isValid) {
+            const subscription = manager.company.subscription;
+            const subscriptionStatus =
+              subscription?.status === "ACTIVE"
+                ? "active"
+                : subscription?.status === "TRIAL"
+                  ? "trial"
+                  : subscription
+                    ? "expired"
+                    : "trial";
+
             return {
               id: manager.id,
               email: manager.email,
               name: manager.name,
               role: "MANAGER",
               companyId: manager.companyId,
+              subscriptionStatus,
+              trialEndsAt: subscription?.trialEndsAt ?? null,
             } satisfies NextAuthUser & { companyId: string };
           }
         }
@@ -72,6 +89,14 @@ export const authOptions: NextAuthOptions = {
         token.role = (user as NextAuthUser & { role?: string }).role;
         token.companyId = (user as NextAuthUser & { companyId?: string })
           .companyId;
+        token.subscriptionStatus = user.subscriptionStatus;
+        const raw = user.trialEndsAt;
+        token.trialEndsAt =
+          raw == null
+            ? null
+            : typeof raw === "string"
+              ? raw
+              : raw.toISOString();
       }
       return token;
     },
@@ -81,6 +106,8 @@ export const authOptions: NextAuthOptions = {
           (token.id as string | undefined) ?? token.sub ?? "";
         session.user.role = token.role as string;
         session.user.companyId = (token.companyId as string) ?? "";
+        session.user.subscriptionStatus = token.subscriptionStatus;
+        session.user.trialEndsAt = token.trialEndsAt ?? null;
       }
       return session;
     },

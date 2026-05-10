@@ -14,18 +14,18 @@ export async function GET(req: NextRequest) {
   const resend = new Resend(process.env.RESEND_API_KEY);
   const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://saleschek.ru";
 
-  // Ищем подписки где триал заканчивается завтра (через 20-28 часов)
+  // Триал «заканчивается завтра»: trialEndsAt попадает в окно ~24ч от момента запуска (23–25ч)
   const now = new Date();
-  const in20h = new Date(now.getTime() + 20 * 60 * 60 * 1000);
-  const in28h = new Date(now.getTime() + 28 * 60 * 60 * 1000);
+  const in23h = new Date(now.getTime() + 23 * 60 * 60 * 1000);
+  const in25h = new Date(now.getTime() + 25 * 60 * 60 * 1000);
 
   const expiringSubscriptions = await prisma.subscription.findMany({
     where: {
       plan: "TRIAL",
       status: "TRIAL",
       trialEndsAt: {
-        gte: in20h,
-        lte: in28h,
+        gte: in23h,
+        lte: in25h,
       },
     },
     include: {

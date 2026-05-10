@@ -31,12 +31,24 @@ export async function getAuthContext() {
     const managers = manager.company.managers;
     const subscription = manager.company.subscription;
 
+    const subscriptionStatus =
+      subscription?.status === "ACTIVE"
+        ? "active"
+        : subscription?.status === "TRIAL"
+          ? "trial"
+          : subscription
+            ? "expired"
+            : "trial";
+
     const user = {
       id: manager.id,
       email: manager.email ?? "",
       name: manager.name,
       passwordHash: null,
       role: Role.MANAGER,
+      subscriptionStatus,
+      trialEndsAt: subscription?.trialEndsAt ?? null,
+      subscriptionEndsAt: subscription?.currentPeriodEnd ?? null,
       createdAt: manager.createdAt,
       updatedAt: manager.createdAt,
       companyId: manager.companyId,

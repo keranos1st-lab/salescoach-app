@@ -9,20 +9,23 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String?
-  passwordHash  String?
-  role          Role      @default(OWNER)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
-  company       Company?  @relation(fields: [companyId], references: [id])
-  companyId     String?
-  managedIn     Manager[]
-  subscription  Subscription?
-  accounts      Account[]
-  sessions      Session[]
-  payments      Payment[]
+  id                   String    @id @default(cuid())
+  email                String    @unique
+  name                 String?
+  passwordHash         String?
+  role                 Role      @default(OWNER)
+  subscriptionStatus   String    @default("trial") // trial | active | expired
+  trialEndsAt          DateTime?
+  subscriptionEndsAt   DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+  company              Company?  @relation(fields: [companyId], references: [id])
+  companyId            String?
+  managedIn            Manager[]
+  subscription         Subscription?
+  accounts             Account[]
+  sessions             Session[]
+  payments             Payment[]
 }
 
 enum Role {

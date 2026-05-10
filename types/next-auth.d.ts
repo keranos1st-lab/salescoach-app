@@ -7,6 +7,8 @@ declare module "next-auth" {
       role?: string;
       companyId: string;
       plan?: string;
+      subscriptionStatus?: string;
+      trialEndsAt?: string | null;
     } & DefaultSession["user"];
   }
 
@@ -14,6 +16,8 @@ declare module "next-auth" {
     role?: string;
     plan?: string;
     companyId?: string;
+    subscriptionStatus?: string;
+    trialEndsAt?: Date | string | null;
   }
 }
 
@@ -23,5 +27,7 @@ declare module "next-auth/jwt" {
     role?: string;
     plan?: string;
     companyId?: string;
+    subscriptionStatus?: string;
+    trialEndsAt?: string | null;
   }
 }

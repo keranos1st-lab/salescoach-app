@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
-import type { Plan } from "@prisma/client";
+import { SubStatus, type Plan } from "@prisma/client";
 
 const PLAN_TO_PRISMA: Record<string, Plan> = {
   STARTER: "START" as Plan,
@@ -44,28 +44,36 @@ export async function POST(req: NextRequest) {
       return new Response("OK", { status: 200 });
     }
 
-    // Обновляем статус платежа в БД
+    const subscriptionEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+
+    // Обновляем статус платежа в БД (InvId сохранён при создании как yookassaId)
     await prisma.payment.update({
       where: { yookassaId: invId },
       data: { status: "succeeded" },
     });
 
-    // Активируем подписку
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      select: { companyId: true },
-    });
+    let companyId: string | null = null;
 
-    if (user?.companyId) {
-      const expiresAt = new Date();
-      expiresAt.setMonth(expiresAt.getMonth() + 1);
+    if (userId) {
+      const updatedOwner = await prisma.user.update({
+        where: { id: userId },
+        data: {
+          subscriptionStatus: "active",
+          subscriptionEndsAt,
+        },
+        select: { companyId: true },
+      });
+      companyId = updatedOwner.companyId ?? null;
+    }
 
+    // Подписка компании (модель Subscription: status ACTIVE, срок — currentPeriodEnd)
+    if (companyId) {
       await prisma.subscription.update({
-        where: { companyId: user.companyId },
+        where: { companyId },
         data: {
           plan: prismaPlan,
-          status: "ACTIVE",
-          currentPeriodEnd: expiresAt,
+          status: SubStatus.ACTIVE,
+          currentPeriodEnd: subscriptionEndsAt,
           cancelAtPeriodEnd: false,
         },
       });
