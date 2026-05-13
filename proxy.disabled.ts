@@ -1,3 +1,5 @@
+/* Temporarily disabled — Next.js ignores this filename. Rename to `proxy.ts` to re-enable.
+   See commit message / incident: ERR_CONNECTION_RESET on prod. */
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
