@@ -34,7 +34,7 @@ function isSubscriptionBlocked(token: {
   return false;
 }
 
-export async function middleware(request: NextRequest) {
+export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   if (isPublicPath(pathname)) {
@@ -58,7 +58,7 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  // Middleware runs only on these prefixes. Out of scope (no matcher → no middleware):
+  // Proxy runs only on these prefixes. Out of scope (no matcher → no proxy):
   // /trial-expired, /_next/*, /favicon.ico, /api/auth/*, and all other routes.
   matcher: [
     "/dashboard/:path*",
