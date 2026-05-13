@@ -2,67 +2,69 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
-/** Destination when trial/subscription ends; must never be caught by subscription redirect logic. */
-function isTrialExpiredPath(pathname: string) {
-  return pathname === "/trial-expired" || pathname.startsWith("/trial-expired/");
+/**
+ * Session JWT cookie naming must match NextAuth (see lib/auth.ts; no custom `cookies.sessionToken` yet).
+ * Optional override: NEXTAUTH_SESSION_COOKIE=same-as-nextauth-config
+ *
+ * IMPORTANT: NEXTAUTH_SECRET in Vercel → Settings → Environment Variables must match `.env`
+ * locally, or JWT decode fails and `getToken` returns null → redirect loop to `/login`.
+ */
+function getSessionTokenReadOptions() {
+  const secureCookie =
+    process.env.NEXTAUTH_URL?.startsWith("https://") === true ||
+    process.env.VERCEL === "1";
+
+  const cookieName =
+    process.env.NEXTAUTH_SESSION_COOKIE?.trim() ||
+    (secureCookie
+      ? "__Secure-next-auth.session-token"
+      : "next-auth.session-token");
+
+  return { secureCookie, cookieName };
 }
 
-function isPublicPath(pathname: string) {
+/** Public routes (proxy may run if matcher expands; `/` handled explicitly — never use startsWith("/").) */
+function isPublicPath(pathname: string): boolean {
   if (pathname === "/") return true;
-  return (
-    isTrialExpiredPath(pathname) ||
-    pathname.startsWith("/login") ||
-    pathname.startsWith("/register") ||
-    pathname.startsWith("/pricing") ||
-    pathname.startsWith("/api/payments") ||
-    pathname.startsWith("/api/auth")
-  );
-}
+  if (pathname === "/favicon.ico") return true;
 
-function isSubscriptionBlocked(token: {
-  subscriptionStatus?: string | null;
-  trialEndsAt?: string | null;
-}) {
-  if (token.subscriptionStatus === "expired") return true;
-  if (
-    token.subscriptionStatus === "trial" &&
-    token.trialEndsAt &&
-    new Date(token.trialEndsAt) < new Date()
-  ) {
-    return true;
-  }
-  return false;
+  const prefixes = [
+    "/login",
+    "/register",
+    "/pricing",
+    "/trial-expired",
+    "/api/auth",
+    "/api/payments",
+    "/_next",
+  ] as const;
+
+  return prefixes.some((p) => pathname === p || pathname.startsWith(`${p}/`));
 }
 
 export async function proxy(request: NextRequest) {
-  const { pathname } = request.nextUrl;
+  const pathname = request.nextUrl.pathname;
 
   if (isPublicPath(pathname)) {
     return NextResponse.next();
   }
 
+  const secret = process.env.NEXTAUTH_SECRET ?? process.env.AUTH_SECRET;
+  const { secureCookie, cookieName } = getSessionTokenReadOptions();
+
   const token = await getToken({
     req: request,
-    secret: process.env.NEXTAUTH_SECRET,
+    secret,
+    secureCookie,
+    cookieName,
   });
 
   if (!token) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (isSubscriptionBlocked(token) && !isTrialExpiredPath(pathname)) {
-    return NextResponse.redirect(new URL("/trial-expired", request.url));
-  }
-
   return NextResponse.next();
 }
 
 export const config = {
-  // Proxy runs only on these prefixes. Out of scope (no matcher → no proxy):
-  // /trial-expired, /_next/*, /favicon.ico, /api/auth/*, and all other routes.
-  matcher: [
-    "/dashboard/:path*",
-    "/settings/:path*",
-    "/api/protected/:path*",
-  ],
+  matcher: ["/dashboard/:path*", "/settings/:path*"],
 };
