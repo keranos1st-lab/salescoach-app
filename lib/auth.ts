@@ -115,4 +115,21 @@ export const authOptions: NextAuthOptions = {
   pages: { signIn: "/login" },
   session: { strategy: "jwt" },
   secret: process.env.NEXTAUTH_SECRET,
+  ...(process.env.NEXTAUTH_SESSION_COOKIE
+    ? {
+        cookies: {
+          sessionToken: {
+            name: process.env.NEXTAUTH_SESSION_COOKIE,
+            options: {
+              httpOnly: true,
+              sameSite: "lax" as const,
+              path: "/",
+              secure:
+                process.env.NEXTAUTH_URL?.startsWith("https://") === true ||
+                process.env.VERCEL === "1",
+            },
+          },
+        },
+      }
+    : {}),
 };
