@@ -2,13 +2,18 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { getToken } from "next-auth/jwt";
 
+/** Destination when trial/subscription ends; must never be caught by subscription redirect logic. */
+function isTrialExpiredPath(pathname: string) {
+  return pathname === "/trial-expired" || pathname.startsWith("/trial-expired/");
+}
+
 function isPublicPath(pathname: string) {
   if (pathname === "/") return true;
   return (
+    isTrialExpiredPath(pathname) ||
     pathname.startsWith("/login") ||
     pathname.startsWith("/register") ||
     pathname.startsWith("/pricing") ||
-    pathname.startsWith("/trial-expired") ||
     pathname.startsWith("/api/payments") ||
     pathname.startsWith("/api/auth")
   );
@@ -45,7 +50,7 @@ export async function middleware(request: NextRequest) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  if (isSubscriptionBlocked(token)) {
+  if (isSubscriptionBlocked(token) && !isTrialExpiredPath(pathname)) {
     return NextResponse.redirect(new URL("/trial-expired", request.url));
   }
 
@@ -53,6 +58,8 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
+  // Middleware runs only on these prefixes. Out of scope (no matcher → no middleware):
+  // /trial-expired, /_next/*, /favicon.ico, /api/auth/*, and all other routes.
   matcher: [
     "/dashboard/:path*",
     "/settings/:path*",
