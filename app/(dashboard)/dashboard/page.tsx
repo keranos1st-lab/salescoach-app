@@ -26,6 +26,7 @@ export default async function DashboardPage() {
     redirect("/login");
   }
 
+  // depends on authContext: prisma uses companyId from ctx; single query — no Promise.all with getAuthContext.
   const callsRaw = await prisma.call.findMany({
     where: { companyId },
     include: { manager: { select: { id: true, name: true } } },

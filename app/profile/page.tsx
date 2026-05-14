@@ -31,6 +31,7 @@ export default async function ProfilePage() {
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
+  // depends on authContext: prisma uses companyId from ctx (single query).
   const callsUsed =
     companyId != null
       ? await prisma.call.count({

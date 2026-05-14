@@ -20,6 +20,7 @@ export default async function ProductPage() {
   const userId = ctx.user.id;
   const companyId = ctx.user.companyId;
 
+  // depends on authContext: prisma uses companyId from ctx (single query).
   const company = await prisma.company.findUnique({
     where: { id: companyId },
     select: { profile: true },

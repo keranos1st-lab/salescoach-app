@@ -24,8 +24,7 @@ function scoreColor(score: number | null) {
 }
 
 export default async function ManagerDetailsPage(props: PageProps) {
-  const { id } = await props.params;
-  const ctx = await getAuthContext();
+  const [{ id }, ctx] = await Promise.all([props.params, getAuthContext()]);
   if (!ctx) {
     redirect("/login");
   }
@@ -34,20 +33,21 @@ export default async function ManagerDetailsPage(props: PageProps) {
     redirect("/login");
   }
 
-  const managerRaw = await prisma.manager.findFirst({
-    where: { id, companyId, isActive: true },
-    select: { id: true, name: true },
-  });
+  const [managerRaw, callsRaw] = await Promise.all([
+    prisma.manager.findFirst({
+      where: { id, companyId, isActive: true },
+      select: { id: true, name: true },
+    }),
+    prisma.call.findMany({
+      where: { companyId, managerId: id },
+      select: { id: true, createdAt: true, score: true },
+      orderBy: { createdAt: "desc" },
+    }),
+  ]);
 
   if (!managerRaw) {
     notFound();
   }
-
-  const callsRaw = await prisma.call.findMany({
-    where: { companyId, managerId: id },
-    select: { id: true, createdAt: true, score: true },
-    orderBy: { createdAt: "desc" },
-  });
 
   const calls: CallRow[] = callsRaw.map((row) => ({
     id: row.id,

@@ -12,12 +12,14 @@ export default async function ManagersPage() {
 
   const companyId = ctx.user.companyId;
 
+  // depends on authContext: prisma uses companyId from ctx.
   const managersRaw = await prisma.manager.findMany({
     where: { companyId, isActive: true },
     select: { id: true, name: true, createdAt: true },
     orderBy: { createdAt: "desc" },
   });
 
+  // depends on managersRaw: call.findMany uses managerIds from first result.
   const managerIds = managersRaw.map((m) => m.id);
   const callsRaw =
     managerIds.length === 0

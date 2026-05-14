@@ -19,6 +19,7 @@ export default async function ReportsPage() {
     redirect("/login");
   }
 
+  // depends on authContext: prisma uses companyId from ctx (single query).
   const managers = await prisma.manager.findMany({
     where: { companyId, isActive: true },
     select: { id: true, name: true },

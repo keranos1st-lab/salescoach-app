@@ -17,22 +17,22 @@ export default async function CallsPage() {
   }
   const userId = ctx.user.id;
 
-  const managers = await prisma.manager.findMany({
-    where: { companyId, isActive: true },
-    select: { id: true, name: true },
-    orderBy: { name: "asc" },
-  });
-
-  const callsRaw = await prisma.call.findMany({
-    where: { companyId },
-    include: { manager: { select: { name: true } } },
-    orderBy: { createdAt: "desc" },
-  });
-
-  const company = await prisma.company.findUnique({
-    where: { id: companyId },
-    select: { profile: true },
-  });
+  const [managers, callsRaw, company] = await Promise.all([
+    prisma.manager.findMany({
+      where: { companyId, isActive: true },
+      select: { id: true, name: true },
+      orderBy: { name: "asc" },
+    }),
+    prisma.call.findMany({
+      where: { companyId },
+      include: { manager: { select: { name: true } } },
+      orderBy: { createdAt: "desc" },
+    }),
+    prisma.company.findUnique({
+      where: { id: companyId },
+      select: { profile: true },
+    }),
+  ]);
   const profile = company?.profile
     ? companyProfileFromJson(company.profile, userId)
     : null;
