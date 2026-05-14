@@ -1,12 +1,52 @@
 "use client";
 
-import { signIn } from "next-auth/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useState } from "react";
 
+/** Credentials sign-in without `next-auth/react` (no SessionProvider / session polling on this route). */
+async function signInCredentials(email: string, password: string) {
+  const origin = window.location.origin;
+  const csrfRes = await fetch(`${origin}/api/auth/csrf`, { credentials: "include" });
+  if (!csrfRes.ok) {
+    return { ok: false as const, error: "CSRF недоступен" };
+  }
+  const { csrfToken } = (await csrfRes.json()) as { csrfToken?: string };
+  if (!csrfToken) {
+    return { ok: false as const, error: "Нет CSRF токена" };
+  }
+
+  const body = new URLSearchParams({
+    csrfToken,
+    email,
+    password,
+    callbackUrl: `${origin}/dashboard`,
+    json: "true",
+    redirect: "false",
+  });
+
+  const res = await fetch(`${origin}/api/auth/callback/credentials`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: body.toString(),
+    credentials: "include",
+  });
+
+  const data = (await res.json().catch(() => ({}))) as {
+    error?: string;
+    url?: string;
+  };
+
+  if (res.ok && !data.error) {
+    return { ok: true as const, url: data.url ?? `${origin}/dashboard` };
+  }
+
+  return {
+    ok: false as const,
+    error: data.error ?? "Неверный email или пароль",
+  };
+}
+
 export function LoginForm() {
-  const router = useRouter();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -16,18 +56,16 @@ export function LoginForm() {
     e.preventDefault();
     setError(null);
     setPending(true);
-    const res = await signIn("credentials", {
-      email: email.trim().toLowerCase(),
+    const result = await signInCredentials(
+      email.trim().toLowerCase(),
       password,
-      redirect: false,
-    });
+    );
     setPending(false);
-    if (res?.error) {
-      setError("Неверный email или пароль");
+    if (!result.ok) {
+      setError(result.error);
       return;
     }
-    router.push("/dashboard");
-    router.refresh();
+    window.location.assign(result.url);
   }
 
   return (
@@ -73,7 +111,7 @@ export function LoginForm() {
       <div className="text-center">
         <Link
           href="/forgot-password"
-          className="text-sm text-zinc-500 hover:text-[#5eead4] transition-colors"
+          className="text-sm text-zinc-500 transition-colors hover:text-[#5eead4]"
         >
           Забыли пароль?
         </Link>

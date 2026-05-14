@@ -1,3 +1,4 @@
+import { AuthSessionProvider } from "@/components/session-provider";
 import { getCachedSession } from "@/lib/cached-session";
 import { redirect } from "next/navigation";
 
@@ -14,5 +15,5 @@ export default async function DashboardLayout({
     redirect("/login");
   }
 
-  return <>{children}</>;
+  return <AuthSessionProvider>{children}</AuthSessionProvider>;
 }

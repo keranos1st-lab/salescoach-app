@@ -1,6 +1,8 @@
 import { BuyButton } from "@/components/pricing/BuyButton";
 import { SiteFooter } from "@/components/site-footer";
-import { getAuthContext } from "@/lib/get-auth-context";
+import type { AuthContext } from "@/lib/get-auth-context";
+// TEMP (incident): skip getAuthContext — avoids getServerSession + Prisma on this public page.
+// import { getAuthContext } from "@/lib/get-auth-context";
 import { PLANS, type PlanKey } from "@/lib/plans";
 import type { Plan } from "@prisma/client";
 import Link from "next/link";
@@ -15,7 +17,7 @@ function planKeyIsCurrent(planKey: PlanKey, currentPlan: Plan): boolean {
 }
 
 export default async function PricingPage() {
-  const ctx = await getAuthContext();
+  const ctx = null as AuthContext | null; // restore: await getAuthContext()
   const currentPlan = ctx?.subscription?.plan ?? ("TRIAL" as Plan);
 
   return (
