@@ -1,5 +1,4 @@
 import { BuyButton } from "@/components/pricing/BuyButton";
-import { PricingRenderLog } from "@/components/pricing/pricing-render-log";
 import { SiteFooter } from "@/components/site-footer";
 import { PLANS, type PlanKey } from "@/lib/plans";
 import type { Plan } from "@prisma/client";
@@ -14,16 +13,12 @@ function planKeyIsCurrent(planKey: PlanKey, currentPlan: Plan): boolean {
   return planKey === currentPlan;
 }
 
-export default async function PricingPage() {
-  // TEMP A/B: skip getAuthContext — if /pricing works on mobile, bottleneck is session/DB here.
-  const authContext = null as any;
-  const currentPlan = authContext?.subscription?.plan ?? ("TRIAL" as Plan);
-
-  console.log("[pricing] page rendered");
+/** Public /pricing: no server auth on first paint; paid «current» is resolved in BuyButton on click. */
+export default function PricingPage() {
+  const currentPlan = "TRIAL" as Plan;
 
   return (
     <main className="min-h-screen bg-zinc-950 px-4 py-14 text-zinc-100">
-      <PricingRenderLog />
       <div className="mx-auto max-w-6xl">
         <header className="text-center">
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
@@ -46,22 +41,12 @@ export default async function PricingPage() {
               </span>
             ))}
           </div>
-          {currentPlan === "TRIAL" ? (
-            <button
-              type="button"
-              disabled
-              className="mt-6 cursor-not-allowed rounded-xl bg-emerald-500/40 px-5 py-2.5 text-sm font-semibold text-emerald-100/80"
-            >
-              Текущий тариф
-            </button>
-          ) : (
-            <Link
-              href="/register"
-              className="mt-6 inline-block rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600"
-            >
-              Начать бесплатно
-            </Link>
-          )}
+          <Link
+            href="/register"
+            className="mt-6 inline-block rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-white transition hover:bg-emerald-600"
+          >
+            Начать бесплатно
+          </Link>
         </section>
 
         <section className="mt-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
