@@ -1,6 +1,6 @@
 import { BuyButton } from "@/components/pricing/BuyButton";
+import { PricingRenderLog } from "@/components/pricing/pricing-render-log";
 import { SiteFooter } from "@/components/site-footer";
-import { getAuthContext } from "@/lib/get-auth-context";
 import { PLANS, type PlanKey } from "@/lib/plans";
 import type { Plan } from "@prisma/client";
 import Link from "next/link";
@@ -15,11 +15,15 @@ function planKeyIsCurrent(planKey: PlanKey, currentPlan: Plan): boolean {
 }
 
 export default async function PricingPage() {
-  const ctx = await getAuthContext();
-  const currentPlan = ctx?.subscription?.plan ?? ("TRIAL" as Plan);
+  // TEMP A/B: skip getAuthContext — if /pricing works on mobile, bottleneck is session/DB here.
+  const authContext = null as any;
+  const currentPlan = authContext?.subscription?.plan ?? ("TRIAL" as Plan);
+
+  console.log("[pricing] page rendered");
 
   return (
     <main className="min-h-screen bg-zinc-950 px-4 py-14 text-zinc-100">
+      <PricingRenderLog />
       <div className="mx-auto max-w-6xl">
         <header className="text-center">
           <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
