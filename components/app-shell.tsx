@@ -1,4 +1,5 @@
 import { LogoutButton } from "@/app/(dashboard)/dashboard/logout-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { getCachedSession } from "@/lib/cached-session";
 import Link from "next/link";
 
@@ -56,7 +57,12 @@ export async function AppShell({
           </div>
         </nav>
         <div className="shrink-0 border-t border-zinc-800 p-3">
-          <p className="mb-2 truncate text-xs text-zinc-400">{userTitle}</p>
+          <div className="mb-3 flex items-start justify-between gap-2">
+            <p className="min-w-0 flex-1 truncate text-xs text-zinc-400">
+              {userTitle}
+            </p>
+            <ThemeToggle />
+          </div>
           <LogoutButton />
         </div>
       </aside>
