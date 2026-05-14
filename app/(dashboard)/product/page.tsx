@@ -4,7 +4,7 @@ import {
   emptyCompanyProfile,
   type CompanyProfile,
 } from "@/lib/company-profile";
-import { getAuthContext } from "@/lib/get-auth-context";
+import { getAuthContextLite } from "@/lib/get-auth-context-lite";
 import { prisma } from "@/lib/prisma";
 import { ProductWorkspace } from "./product-workspace";
 import { redirect } from "next/navigation";
@@ -12,7 +12,7 @@ import { redirect } from "next/navigation";
 export type { CompanyProfile };
 
 export default async function ProductPage() {
-  const ctx = await getAuthContext();
+  const ctx = await getAuthContextLite();
   if (!ctx?.user.companyId) {
     redirect("/login");
   }

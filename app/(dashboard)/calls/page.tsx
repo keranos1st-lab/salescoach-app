@@ -1,13 +1,13 @@
 import { CallsWorkspace, type CallListItem } from "./calls-workspace";
 import { AppShell } from "@/components/app-shell";
 import { companyProfileFromJson } from "@/lib/company-profile";
-import { getAuthContext } from "@/lib/get-auth-context";
+import { getAuthContextLite } from "@/lib/get-auth-context-lite";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
 export default async function CallsPage() {
-  const ctx = await getAuthContext();
+  const ctx = await getAuthContextLite();
   if (!ctx) {
     redirect("/login");
   }

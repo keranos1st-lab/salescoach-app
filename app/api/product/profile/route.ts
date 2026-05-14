@@ -1,4 +1,4 @@
-import { getAuthContext } from "@/lib/get-auth-context";
+import { getAuthContextLite } from "@/lib/get-auth-context-lite";
 import {
   companyProfileFromJson,
   companyProfileToJson,
@@ -21,7 +21,7 @@ function parseOptionalInt(v: unknown): number | null {
 
 export async function POST(request: NextRequest) {
   try {
-    const ctx = await getAuthContext();
+    const ctx = await getAuthContextLite();
     if (!ctx?.user.companyId) {
       return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
     }

@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { PaymentToast } from "@/components/profile/PaymentToast";
 import { ProfileForm } from "@/components/profile/ProfileForm";
-import { getAuthContext } from "@/lib/get-auth-context";
+import { getAuthContextLite } from "@/lib/get-auth-context-lite";
 import { PLANS, type PlanKey } from "@/lib/plans";
 import { prisma } from "@/lib/prisma";
 import type { Plan, Subscription } from "@prisma/client";
@@ -21,7 +21,7 @@ function prismaPlanToPlanKey(plan: Plan): PlanKey {
 }
 
 export default async function ProfilePage() {
-  const ctx = await getAuthContext();
+  const ctx = await getAuthContextLite();
   if (!ctx) {
     redirect("/login");
   }
@@ -31,17 +31,21 @@ export default async function ProfilePage() {
 
   const now = new Date();
   const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1);
-  // depends on authContext: prisma uses companyId from ctx (single query).
-  const callsUsed =
+  const [callsUsed, managersUsed] = await Promise.all([
     companyId != null
-      ? await prisma.call.count({
+      ? prisma.call.count({
           where: {
             companyId,
             createdAt: { gte: startOfMonth },
           },
         })
-      : 0;
-  const managersUsed = ctx.managers.length;
+      : Promise.resolve(0),
+    companyId != null
+      ? prisma.manager.count({
+          where: { companyId, isActive: true },
+        })
+      : Promise.resolve(0),
+  ]);
 
   const subUsage = subscription as SubscriptionWithUsage | null | undefined;
 

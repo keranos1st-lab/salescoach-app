@@ -3,7 +3,7 @@ import {
   companyProfileFromJson,
   type CompanyProfile,
 } from "@/lib/company-profile";
-import { getAuthContext } from "@/lib/get-auth-context";
+import { getAuthContextLite } from "@/lib/get-auth-context-lite";
 import { prisma } from "@/lib/prisma";
 import { createSupabaseServiceClient } from "@/lib/supabase-service";
 import {
@@ -142,7 +142,7 @@ async function assemblyAiResponseJson<T>(response: Response): Promise<T> {
 
 export async function POST(request: NextRequest) {
   try {
-    const ctx = await getAuthContext();
+    const ctx = await getAuthContextLite();
     if (!ctx?.user.companyId) {
       return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
     }
