@@ -1,6 +1,4 @@
 import type { Metadata } from "next";
-import { GuestAuthButtons } from "@/components/auth-buttons";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { Geist, Geist_Mono } from "next/font/google";
 import "./globals.css";
 
@@ -29,18 +27,7 @@ export default function RootLayout({
       data-theme="dark"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-screen flex flex-col">
-        {/*
-          TEMP (incident): no SessionProvider / no getServerSession in root header —
-          avoids client /api/auth/session on public routes. Dashboard layout wraps
-          AuthSessionProvider; restore HeaderAuthActions after root is safe.
-        */}
-        <header className="fixed right-4 top-4 z-50 flex items-center gap-2">
-          <GuestAuthButtons />
-          <ThemeToggle />
-        </header>
-        {children}
-      </body>
+      <body className="min-h-screen flex flex-col">{children}</body>
     </html>
   );
 }

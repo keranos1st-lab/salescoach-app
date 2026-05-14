@@ -1,3 +1,4 @@
+import { PublicSurfaceHeader } from "@/components/public-surface-header";
 import { Inter } from "next/font/google";
 
 const inter = Inter({
@@ -9,5 +10,10 @@ export default function AuthLayout({
 }: {
   children: React.ReactNode;
 }) {
-  return <div className={`${inter.className} min-h-full`}>{children}</div>;
+  return (
+    <div className={`${inter.className} min-h-full`}>
+      <PublicSurfaceHeader />
+      {children}
+    </div>
+  );
 }
