@@ -60,7 +60,8 @@ export async function POST(req: Request) {
       .update(`${login}:${amount}:${invId}:${password1}:Shp_plan=${plan}:Shp_userId=${userId}`)
       .digest("hex");
 
-    const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://saleschek.ru";
+    const appUrl =
+      process.env.NEXT_PUBLIC_APP_URL ?? "https://salescoach-app.vercel.app";
 
     const params = new URLSearchParams({
       MerchantLogin: login,

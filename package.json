@@ -8,7 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate",
-    "warmup": "curl https://saleschek.ru/api/auth/session"
+    "warmup": "curl https://salescoach-app.vercel.app/api/auth/session"
   },
   "dependencies": {
     "@prisma/client": "^6.19.3",

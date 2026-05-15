@@ -64,7 +64,8 @@ export async function POST(req: Request) {
     // Отправляем приветственное письмо (не блокируем регистрацию при ошибке)
     try {
       const resend = new Resend(process.env.RESEND_API_KEY);
-      const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://saleschek.ru";
+      const appUrl =
+        process.env.NEXT_PUBLIC_APP_URL ?? "https://salescoach-app.vercel.app";
       const userName = result.user.name ?? "пользователь";
       const trialEndsAt = new Date(Date.now() + 4 * 24 * 60 * 60 * 1000);
       const trialDate = trialEndsAt.toLocaleDateString("ru-RU", {

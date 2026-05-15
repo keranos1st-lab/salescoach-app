@@ -12,7 +12,8 @@ export async function GET(req: NextRequest) {
   }
 
   const resend = new Resend(process.env.RESEND_API_KEY);
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "https://saleschek.ru";
+  const appUrl =
+    process.env.NEXT_PUBLIC_APP_URL ?? "https://salescoach-app.vercel.app";
 
   // Триал «заканчивается завтра»: trialEndsAt попадает в окно ~24ч от момента запуска (23–25ч)
   const now = new Date();
