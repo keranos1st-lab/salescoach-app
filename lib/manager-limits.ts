@@ -1,13 +1,41 @@
 import { PLANS, type PlanKey } from "@/lib/plans";
 import { prismaPlanToPlanKey } from "@/lib/subscription-ui";
-import type { Plan, Subscription } from "@prisma/client";
+import type { Plan, SubStatus, Subscription } from "@prisma/client";
 
+export function planKeyToPrismaPlan(planKey: PlanKey): Plan {
+  if (planKey === "STARTER") {
+    return "START";
+  }
+  return planKey as Plan;
+}
+
+export type SubscriptionLimitsSource = {
+  plan: Plan;
+  maxManagers?: number | null;
+  status?: SubStatus | null;
+} | null;
+
+/**
+ * Effective manager cap for the current plan.
+ * Paid ACTIVE plans use catalog limits (Starter = 1), not stale trial maxManagers in DB.
+ */
 export function getAllowedManagersLimit(
-  subscription: Pick<Subscription, "plan" | "maxManagers"> | null | undefined,
+  subscription: SubscriptionLimitsSource | undefined,
 ): number {
   const plan = subscription?.plan ?? ("TRIAL" as Plan);
   const planKey = prismaPlanToPlanKey(plan);
-  return subscription?.maxManagers ?? PLANS[planKey].maxManagers;
+  const catalogLimit = PLANS[planKey].maxManagers;
+
+  if (!subscription) {
+    return catalogLimit;
+  }
+
+  // Paid plan in DB: catalog limit (ignore stale trial maxManagers left in subscription row)
+  if (plan !== "TRIAL") {
+    return catalogLimit;
+  }
+
+  return subscription.maxManagers ?? catalogLimit;
 }
 
 export type ManagerLimitState = {

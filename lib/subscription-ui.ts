@@ -1,7 +1,9 @@
 import { PLANS, type PlanKey } from "@/lib/plans";
 import {
+  getAllowedManagersLimit,
   getManagerLimitState,
   managersLimitLine,
+  planKeyToPrismaPlan,
 } from "@/lib/manager-limits";
 import type { Plan, SubStatus } from "@prisma/client";
 
@@ -177,7 +179,11 @@ export function buildSubscriptionStatusBarModel(input: {
   }
 
   const maxCalls = input.maxCalls ?? planDef?.maxCalls ?? null;
-  const maxManagers = input.maxManagers ?? planDef?.maxManagers ?? null;
+  const allowedManagers = getAllowedManagersLimit({
+    plan: planKeyToPrismaPlan(input.plan),
+    maxManagers: input.maxManagers,
+    status: input.subStatus,
+  });
 
   const callsUnlimited =
     input.plan === "BUSINESS" || maxCalls == null;
@@ -185,15 +191,15 @@ export function buildSubscriptionStatusBarModel(input: {
     ? "Без лимита"
     : `Загружено ${input.callsUsed} из ${maxCalls}`;
 
-  const managerLimit =
-    maxManagers == null
-      ? null
-      : getManagerLimitState(input.managersUsed, maxManagers);
+  const managerLimit = getManagerLimitState(
+    input.managersUsed,
+    allowedManagers,
+  );
 
-  const managersLine =
-    maxManagers == null
-      ? "Без лимита"
-      : managersLimitLine(input.managersUsed, maxManagers);
+  const managersLine = managersLimitLine(
+    input.managersUsed,
+    allowedManagers,
+  );
 
   const paidDaysLeft = input.currentPeriodEnd
     ? daysUntil(input.currentPeriodEnd)

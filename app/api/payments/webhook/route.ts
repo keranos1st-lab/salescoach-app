@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 import { createHash } from "crypto";
 import { prisma } from "@/lib/prisma";
+import { PLANS, type PlanKey } from "@/lib/plans";
 import { SubStatus, type Plan } from "@prisma/client";
 
 const PLAN_TO_PRISMA: Record<string, Plan> = {
@@ -45,6 +46,8 @@ export async function POST(req: NextRequest) {
     }
 
     const subscriptionEndsAt = new Date(Date.now() + 30 * 24 * 60 * 60 * 1000);
+    const paidPlanKey = plan as PlanKey;
+    const planLimits = PLANS[paidPlanKey];
 
     // Обновляем статус платежа в БД (InvId сохранён при создании как yookassaId)
     await prisma.payment.update({
@@ -75,6 +78,10 @@ export async function POST(req: NextRequest) {
           status: SubStatus.ACTIVE,
           currentPeriodEnd: subscriptionEndsAt,
           cancelAtPeriodEnd: false,
+          maxManagers: planLimits.maxManagers,
+          ...(planLimits.maxCalls != null
+            ? { maxCalls: planLimits.maxCalls }
+            : {}),
         },
       });
     }
