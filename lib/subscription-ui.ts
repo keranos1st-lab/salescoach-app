@@ -1,5 +1,41 @@
 import type { PlanKey } from "@/lib/plans";
-import type { SubStatus } from "@prisma/client";
+import type { Plan, SubStatus } from "@prisma/client";
+
+export function prismaPlanToPlanKey(plan: Plan): PlanKey {
+  if (plan === "START") {
+    return "STARTER";
+  }
+  return plan as PlanKey;
+}
+
+export function getProductAccessBlock(sub: {
+  plan: PlanKey;
+  subStatus: SubStatus | null | undefined;
+  trialDaysLeft: number;
+}): {
+  blocked: boolean;
+  title: string;
+  message: string;
+} {
+  const ui = deriveSubscriptionUi(sub);
+
+  if (!ui.showBanner) {
+    return {
+      blocked: false,
+      title: "",
+      message: "",
+    };
+  }
+
+  const trialExpired = sub.plan === "TRIAL" && sub.trialDaysLeft === 0;
+  const title = trialExpired ? "Пробный период закончился" : "Срок тарифа истёк";
+
+  return {
+    blocked: true,
+    title,
+    message: "Выберите тариф, чтобы продолжить пользоваться сервисом",
+  };
+}
 
 export type SubscriptionDisplayStatus = "trial" | "active" | "expired" | "none";
 
