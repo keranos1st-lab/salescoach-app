@@ -2,6 +2,7 @@ import { CallsWorkspace, type CallListItem } from "./calls-workspace";
 import { AppShell } from "@/components/app-shell";
 import { companyProfileFromJson } from "@/lib/company-profile";
 import { getAuthContextLite } from "@/lib/get-auth-context-lite";
+import { getMonthlyCallLimitStateForCompany } from "@/lib/call-limits";
 import {
   getAllowedManagersLimit,
   getManagerLimitState,
@@ -63,6 +64,10 @@ export default async function CallsPage() {
 
   const allowedManagers = getAllowedManagersLimit(ctx.subscription);
   const managerLimit = getManagerLimitState(managers.length, allowedManagers);
+  const callLimit = await getMonthlyCallLimitStateForCompany(
+    companyId,
+    ctx.subscription,
+  );
 
   return (
     <AppShell activeHref="/calls">
@@ -103,6 +108,7 @@ export default async function CallsPage() {
           managers={managers}
           initialCalls={initialCalls}
           managerLimit={managerLimit}
+          callLimit={callLimit}
         />
       </main>
     </AppShell>

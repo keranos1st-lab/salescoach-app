@@ -1,5 +1,10 @@
 import { PLANS, type PlanKey } from "@/lib/plans";
 import {
+  getAllowedCallsLimit,
+  callsLimitLine,
+  getCallLimitState,
+} from "@/lib/call-limits";
+import {
   getAllowedManagersLimit,
   getManagerLimitState,
   managersLimitLine,
@@ -11,6 +16,8 @@ export type SubscriptionStatusBarModel = {
   planLabel: string;
   termLine: string;
   callsLine: string;
+  callsAtOrOverLimit: boolean;
+  callsWarning: string | null;
   managersLine: string;
   managersOverLimit: boolean;
   managersWarning: string | null;
@@ -178,18 +185,20 @@ export function buildSubscriptionStatusBarModel(input: {
     termLine = "Активен";
   }
 
-  const maxCalls = input.maxCalls ?? planDef?.maxCalls ?? null;
-  const allowedManagers = getAllowedManagersLimit({
+  const subscriptionSource = {
     plan: planKeyToPrismaPlan(input.plan),
     maxManagers: input.maxManagers,
+    maxCalls: input.maxCalls,
     status: input.subStatus,
-  });
+  };
 
-  const callsUnlimited =
-    input.plan === "BUSINESS" || maxCalls == null;
-  const callsLine = callsUnlimited
+  const allowedCalls = getAllowedCallsLimit(subscriptionSource);
+  const callLimit = getCallLimitState(input.callsUsed, allowedCalls);
+  const allowedManagers = getAllowedManagersLimit(subscriptionSource);
+
+  const callsLine = callLimit.unlimited
     ? "Без лимита"
-    : `Загружено ${input.callsUsed} из ${maxCalls}`;
+    : callsLimitLine(input.callsUsed, callLimit.allowed!);
 
   const managerLimit = getManagerLimitState(
     input.managersUsed,
@@ -217,9 +226,11 @@ export function buildSubscriptionStatusBarModel(input: {
     planLabel,
     termLine,
     callsLine,
+    callsAtOrOverLimit: callLimit.atOrOverLimit,
+    callsWarning: callLimit.warningMessage,
     managersLine,
-    managersOverLimit: managerLimit?.overLimit ?? false,
-    managersWarning: managerLimit?.warningMessage ?? null,
+    managersOverLimit: managerLimit.overLimit,
+    managersWarning: managerLimit.warningMessage,
     ctaLabel: ui.ctaLabel,
     displayStatus: ui.displayStatus,
     soonEnding,

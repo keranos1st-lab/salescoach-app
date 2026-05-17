@@ -6,6 +6,11 @@ import { SubscriptionManagement } from "@/components/profile/SubscriptionManagem
 import { getAuthContextLite } from "@/lib/get-auth-context-lite";
 import { PLANS, type PlanKey } from "@/lib/plans";
 import {
+  getAllowedCallsLimit,
+  callsLimitLine,
+  getCallLimitState,
+} from "@/lib/call-limits";
+import {
   getAllowedManagersLimit,
   getManagerLimitState,
   managersLimitLine,
@@ -65,11 +70,11 @@ export default async function ProfilePage() {
       ? "Бесплатно"
       : `${PLANS[planLabelKey].price.toLocaleString("ru-RU")} ₽/мес`;
 
-  const maxCallsFallback = PLANS[planLabelKey].maxCalls;
-  const maxCallsDisplay =
-    plan === "BUSINESS" || maxCallsFallback == null
-      ? "∞"
-      : String(subscription?.maxCalls ?? maxCallsFallback);
+  const allowedCalls = getAllowedCallsLimit(subscription);
+  const callLimit = getCallLimitState(callsUsed, allowedCalls);
+  const callsUsageLine = callLimit.unlimited
+    ? "Без лимита"
+    : callsLimitLine(callsUsed, callLimit.allowed!);
   const allowedManagers = getAllowedManagersLimit(subscription);
   const managerLimit = getManagerLimitState(managersUsed, allowedManagers);
 
@@ -115,9 +120,14 @@ export default async function ProfilePage() {
         <section className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
           <h2 className="text-lg font-semibold text-zinc-100">Использование</h2>
           <div className="mt-4 space-y-2 text-sm text-zinc-300">
-            <p>
-              Звонки: {subUsage?.callsUsed ?? callsUsed} / {maxCallsDisplay}
+            <p className={callLimit.atOrOverLimit ? "text-red-400" : undefined}>
+              Звонки: {callsUsageLine}
             </p>
+            {callLimit.warningMessage ? (
+              <p className="text-sm text-red-400" role="alert">
+                {callLimit.warningMessage}
+              </p>
+            ) : null}
             <p className={managerLimit.overLimit ? "text-red-400" : undefined}>
               Менеджеры:{" "}
               {managersLimitLine(

@@ -24,6 +24,8 @@ export function SubscriptionStatusBar({
   planLabel,
   termLine,
   callsLine,
+  callsAtOrOverLimit,
+  callsWarning,
   managersLine,
   managersOverLimit,
   managersWarning,
@@ -33,6 +35,14 @@ export function SubscriptionStatusBar({
 }: SubscriptionStatusBarProps) {
   return (
     <div className="rounded-xl border border-zinc-700/80 bg-zinc-950/80 p-3">
+      {callsWarning ? (
+        <p
+          role="alert"
+          className="mb-2.5 rounded-lg border border-red-900/50 bg-red-950/40 px-2.5 py-2 text-[10px] leading-snug text-red-300"
+        >
+          {callsWarning}
+        </p>
+      ) : null}
       {managersWarning ? (
         <p
           role="alert"
@@ -63,7 +73,15 @@ export function SubscriptionStatusBar({
         <div className="grid w-full grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-zinc-500 sm:w-auto sm:min-w-[140px]">
           <div>
             <span className="block text-zinc-600">Звонки</span>
-            <span className="text-zinc-300">{callsLine}</span>
+            <span
+              className={
+                callsAtOrOverLimit
+                  ? "font-medium text-red-400"
+                  : "text-zinc-300"
+              }
+            >
+              {callsLine}
+            </span>
           </div>
           <div>
             <span className="block text-zinc-600">Менеджеры</span>

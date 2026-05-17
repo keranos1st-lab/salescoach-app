@@ -9,6 +9,7 @@ import {
   useState,
   type DragEvent,
 } from "react";
+import type { CallLimitState } from "@/lib/call-limits";
 import type { ManagerLimitState } from "@/lib/manager-limits";
 
 export type ManagerOption = { id: string; name: string };
@@ -217,10 +218,12 @@ export function CallsWorkspace({
   managers,
   initialCalls,
   managerLimit,
+  callLimit,
 }: {
   managers: ManagerOption[];
   initialCalls: CallListItem[];
   managerLimit: ManagerLimitState;
+  callLimit: CallLimitState;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -241,8 +244,11 @@ export function CallsWorkspace({
     setCalls(initialCalls);
   }, [initialCalls]);
 
+  const uploadBlocked =
+    managerLimit.overLimit || callLimit.atOrOverLimit;
+
   const pickFile = useCallback((f: File | null | undefined) => {
-    if (managerLimit.overLimit) return;
+    if (uploadBlocked) return;
     if (!f || !f.size) return;
     if (!f.type.startsWith("audio/")) {
       setError("Нужен аудиофайл (например mp3, wav, webm)");
@@ -251,7 +257,7 @@ export function CallsWorkspace({
     setError(null);
     setFile(f);
     setResult(null);
-  }, [managerLimit.overLimit]);
+  }, [uploadBlocked]);
 
   const onDrop = useCallback(
     (e: DragEvent) => {
@@ -272,11 +278,11 @@ export function CallsWorkspace({
     setDragOver(false);
   }, []);
 
-  const analysisBlockedMessage = callsAnalysisBlockedMessage(managerLimit);
-  const analysisBlocked = managerLimit.overLimit;
+  const managerBlockedMessage = callsAnalysisBlockedMessage(managerLimit);
+  const callsBlockedMessage = callLimit.warningMessage;
 
   async function analyze() {
-    if (analysisBlocked || !file || !managerId) return;
+    if (uploadBlocked || !file || !managerId) return;
     setLoading(true);
     setError(null);
     try {
@@ -339,7 +345,7 @@ export function CallsWorkspace({
   }
 
   const canAnalyze = Boolean(
-    !analysisBlocked && file && managerId && !loading,
+    !uploadBlocked && file && managerId && !loading,
   );
   const managerFilterOptions = useMemo(() => {
     const uniq = Array.from(
@@ -361,12 +367,20 @@ export function CallsWorkspace({
         </p>
       </header>
 
-      {analysisBlockedMessage ? (
+      {callsBlockedMessage ? (
         <p
           className="rounded-lg border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-300"
           role="alert"
         >
-          {analysisBlockedMessage}
+          {callsBlockedMessage}
+        </p>
+      ) : null}
+      {managerBlockedMessage ? (
+        <p
+          className="rounded-lg border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-300"
+          role="alert"
+        >
+          {managerBlockedMessage}
         </p>
       ) : null}
 
@@ -377,10 +391,10 @@ export function CallsWorkspace({
       ) : null}
 
       <div
-        role={analysisBlocked ? undefined : "button"}
-        tabIndex={analysisBlocked ? undefined : 0}
+        role={uploadBlocked ? undefined : "button"}
+        tabIndex={uploadBlocked ? undefined : 0}
         onKeyDown={
-          analysisBlocked
+          uploadBlocked
             ? undefined
             : (e) => {
                 if (e.key === "Enter" || e.key === " ") {
@@ -389,12 +403,12 @@ export function CallsWorkspace({
                 }
               }
         }
-        onDrop={analysisBlocked ? undefined : onDrop}
-        onDragOver={analysisBlocked ? undefined : onDragOver}
-        onDragLeave={analysisBlocked ? undefined : onDragLeave}
-        onClick={analysisBlocked ? undefined : () => inputRef.current?.click()}
+        onDrop={uploadBlocked ? undefined : onDrop}
+        onDragOver={uploadBlocked ? undefined : onDragOver}
+        onDragLeave={uploadBlocked ? undefined : onDragLeave}
+        onClick={uploadBlocked ? undefined : () => inputRef.current?.click()}
         className={`rounded-2xl border-2 border-dashed px-6 py-14 text-center transition ${
-          analysisBlocked
+          uploadBlocked
             ? "cursor-not-allowed border-zinc-800 bg-zinc-900/20 opacity-50"
             : dragOver
               ? "cursor-pointer border-[#0d9488] bg-[#0d9488]/10"
@@ -406,7 +420,7 @@ export function CallsWorkspace({
           type="file"
           accept="audio/*"
           className="hidden"
-          disabled={analysisBlocked}
+          disabled={uploadBlocked}
           onChange={(e) => pickFile(e.target.files?.[0])}
         />
         <p className="text-sm font-medium text-zinc-200">
@@ -428,7 +442,7 @@ export function CallsWorkspace({
           id="manager"
           value={managerId}
           onChange={(e) => setManagerId(e.target.value)}
-          disabled={managers.length === 0 || analysisBlocked}
+          disabled={managers.length === 0 || uploadBlocked}
           className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-[#0d9488] focus:ring-2 focus:ring-[#0d9488]/25 disabled:opacity-50"
         >
           <option value="">Выберите менеджера</option>

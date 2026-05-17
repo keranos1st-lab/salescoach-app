@@ -12,6 +12,7 @@ export function planKeyToPrismaPlan(planKey: PlanKey): Plan {
 export type SubscriptionLimitsSource = {
   plan: Plan;
   maxManagers?: number | null;
+  maxCalls?: number | null;
   status?: SubStatus | null;
 } | null;
 

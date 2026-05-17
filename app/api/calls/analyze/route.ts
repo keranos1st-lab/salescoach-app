@@ -3,6 +3,7 @@ import {
   companyProfileFromJson,
   type CompanyProfile,
 } from "@/lib/company-profile";
+import { getMonthlyCallLimitStateForCompany } from "@/lib/call-limits";
 import { getAuthContextLite } from "@/lib/get-auth-context-lite";
 import { prisma } from "@/lib/prisma";
 import { createSupabaseServiceClient } from "@/lib/supabase-service";
@@ -217,6 +218,17 @@ export async function POST(request: NextRequest) {
       "[calls/analyze] SUPABASE_STORAGE_CALLS_BUCKET JSON:",
       JSON.stringify(process.env.SUPABASE_STORAGE_CALLS_BUCKET ?? null)
     );
+
+    const callLimit = await getMonthlyCallLimitStateForCompany(
+      companyId,
+      ctx.subscription,
+    );
+    if (callLimit.atOrOverLimit) {
+      return NextResponse.json(
+        { error: callLimit.createBlockedMessage },
+        { status: 403 },
+      );
+    }
 
     const supabase = createSupabaseServiceClient();
 
