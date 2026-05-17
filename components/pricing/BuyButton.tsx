@@ -63,6 +63,7 @@ export function BuyButton({ plan }: BuyButtonProps) {
         error?: string;
       };
       if (res.status === 401) {
+        alert("Сессия истекла. Войдите снова.");
         redirectToLoginWithPlan(plan);
         return;
       }
