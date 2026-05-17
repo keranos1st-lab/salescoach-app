@@ -38,7 +38,7 @@ export default function TrialExpiredPage() {
             работу с SalesChek.
           </p>
           <Link
-            href="/pricing"
+            href="/profile?open=plans"
             className="mt-8 inline-flex w-full items-center justify-center rounded-xl bg-teal-600 px-6 py-3.5 text-base font-semibold text-white transition hover:bg-teal-500"
           >
             Выбрать тариф

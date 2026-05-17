@@ -1,11 +1,13 @@
 import { Suspense } from "react";
 import { PaymentToast } from "@/components/profile/PaymentToast";
 import { ProfileForm } from "@/components/profile/ProfileForm";
+import { ProfilePlansSection } from "@/components/profile/ProfilePlansSection";
+import { SubscriptionManagement } from "@/components/profile/SubscriptionManagement";
 import { getAuthContextLite } from "@/lib/get-auth-context-lite";
 import { PLANS, type PlanKey } from "@/lib/plans";
+import { deriveSubscriptionUi } from "@/lib/subscription-ui";
 import { prisma } from "@/lib/prisma";
 import type { Plan, Subscription } from "@prisma/client";
-import Link from "next/link";
 import { redirect } from "next/navigation";
 
 type SubscriptionWithUsage = Subscription & {
@@ -74,9 +76,18 @@ export default async function ProfilePage() {
     );
   }
 
+  const subscriptionUi = deriveSubscriptionUi({
+    plan: planLabelKey,
+    subStatus: subscription?.status,
+    trialDaysLeft,
+  });
+
+  const trialDaysLeftDisplay =
+    plan === "TRIAL" && trialEndsAt ? trialDaysLeft : null;
+
   return (
     <main className="min-h-screen bg-zinc-950 px-4 py-10 text-zinc-100">
-      <div className="mx-auto flex max-w-2xl flex-col gap-6">
+      <div className="mx-auto flex max-w-3xl flex-col gap-6">
         <section className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
           <h2 className="text-lg font-semibold text-zinc-100">Личные данные</h2>
           <div className="mt-4">
@@ -84,38 +95,32 @@ export default async function ProfilePage() {
           </div>
         </section>
 
+        <SubscriptionManagement
+          planLabel={planLabel}
+          priceLine={priceLine}
+          displayStatus={subscriptionUi.displayStatus}
+          statusLabel={subscriptionUi.statusLabel}
+          trialDaysLeft={trialDaysLeftDisplay}
+          showBanner={subscriptionUi.showBanner}
+          bannerMessage={subscriptionUi.bannerMessage}
+          ctaLabel={subscriptionUi.ctaLabel}
+        />
+
         <section className="rounded-2xl border border-zinc-800 bg-zinc-900 p-6">
-          <h2 className="text-lg font-semibold text-zinc-100">Текущий тариф</h2>
+          <h2 className="text-lg font-semibold text-zinc-100">Использование</h2>
           <div className="mt-4 space-y-2 text-sm text-zinc-300">
-            <p>
-              <span className="text-zinc-500">Название: </span>
-              {planLabel}
-            </p>
-            <p>
-              <span className="text-zinc-500">Цена: </span>
-              {priceLine}
-            </p>
             <p>
               Звонки: {subUsage?.callsUsed ?? callsUsed} / {maxCallsDisplay}
             </p>
             <p>
               Менеджеры: {subUsage?.managersUsed ?? managersUsed} / {maxManagers}
             </p>
-            {plan === "TRIAL" && trialEndsAt ? (
-              trialDaysLeft === 0 ? (
-                <p className="text-red-400">Пробный период истёк</p>
-              ) : (
-                <p className="text-emerald-400">Осталось {trialDaysLeft} дней</p>
-              )
-            ) : null}
           </div>
-          <Link
-            href="/pricing"
-            className="mt-4 inline-block rounded-lg bg-teal-600 px-4 py-2 text-sm font-semibold text-white transition hover:bg-teal-500"
-          >
-            Сменить тариф →
-          </Link>
         </section>
+
+        <Suspense fallback={null}>
+          <ProfilePlansSection currentPlanKey={planLabelKey} />
+        </Suspense>
       </div>
       <Suspense fallback={null}>
         <PaymentToast />

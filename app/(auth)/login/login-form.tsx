@@ -1,10 +1,26 @@
 "use client";
 
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { useState } from "react";
 
+function resolveCallbackUrl(origin: string, raw: string | null): string {
+  const path = raw?.trim() || "/dashboard";
+  if (path.startsWith("http://") || path.startsWith("https://")) {
+    return path;
+  }
+  if (path.startsWith("/")) {
+    return `${origin}${path}`;
+  }
+  return `${origin}/${path}`;
+}
+
 /** Credentials sign-in without `next-auth/react` (no SessionProvider / session polling on this route). */
-async function signInCredentials(email: string, password: string) {
+async function signInCredentials(
+  email: string,
+  password: string,
+  callbackUrl: string,
+) {
   const origin = window.location.origin;
   const csrfRes = await fetch(`${origin}/api/auth/csrf`, { credentials: "include" });
   if (!csrfRes.ok) {
@@ -19,7 +35,7 @@ async function signInCredentials(email: string, password: string) {
     csrfToken,
     email,
     password,
-    callbackUrl: `${origin}/dashboard`,
+    callbackUrl,
     json: "true",
     redirect: "false",
   });
@@ -37,7 +53,7 @@ async function signInCredentials(email: string, password: string) {
   };
 
   if (res.ok && !data.error) {
-    return { ok: true as const, url: data.url ?? `${origin}/dashboard` };
+    return { ok: true as const, url: data.url ?? callbackUrl };
   }
 
   return {
@@ -47,6 +63,7 @@ async function signInCredentials(email: string, password: string) {
 }
 
 export function LoginForm() {
+  const searchParams = useSearchParams();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -56,9 +73,17 @@ export function LoginForm() {
     e.preventDefault();
     setError(null);
     setPending(true);
+
+    const origin = window.location.origin;
+    const callbackUrl = resolveCallbackUrl(
+      origin,
+      searchParams.get("callbackUrl"),
+    );
+
     const result = await signInCredentials(
       email.trim().toLowerCase(),
       password,
+      callbackUrl,
     );
     setPending(false);
     if (!result.ok) {
