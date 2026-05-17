@@ -3,6 +3,7 @@ import { SubscriptionAccessGate } from "@/components/subscription-access-gate";
 import { getCachedSession } from "@/lib/cached-session";
 import { getAuthContextLite } from "@/lib/get-auth-context-lite";
 import {
+  computeTrialDaysLeft,
   getProductAccessBlock,
   prismaPlanToPlanKey,
 } from "@/lib/subscription-ui";
@@ -29,14 +30,7 @@ export default async function DashboardLayout({
   const plan = subscription?.plan ?? ("TRIAL" as Plan);
   const planKey = prismaPlanToPlanKey(plan);
 
-  const trialEndsAt = subscription?.trialEndsAt ?? null;
-  let trialDaysLeft = 0;
-  if (plan === "TRIAL" && trialEndsAt) {
-    trialDaysLeft = Math.max(
-      0,
-      Math.ceil((new Date(trialEndsAt).getTime() - Date.now()) / 86400000),
-    );
-  }
+  const trialDaysLeft = computeTrialDaysLeft(plan, subscription?.trialEndsAt);
 
   const access = getProductAccessBlock({
     plan: planKey,

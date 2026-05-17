@@ -1,6 +1,15 @@
 import { LogoutButton } from "@/app/(dashboard)/dashboard/logout-button";
+import { SubscriptionStatusBar } from "@/components/subscription-status-bar";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { getCompanyUsageCounts } from "@/lib/company-usage";
 import { getCachedSession } from "@/lib/cached-session";
+import { getAuthContextLite } from "@/lib/get-auth-context-lite";
+import {
+  buildSubscriptionStatusBarModel,
+  computeTrialDaysLeft,
+  prismaPlanToPlanKey,
+} from "@/lib/subscription-ui";
+import type { Plan } from "@prisma/client";
 import Link from "next/link";
 
 const nav = [
@@ -23,6 +32,28 @@ export async function AppShell({
     session?.user?.name?.trim() ||
     session?.user?.email?.trim() ||
     "Пользователь";
+
+  const ctx = await getAuthContextLite();
+  const subscription = ctx?.subscription ?? null;
+  const plan = subscription?.plan ?? ("TRIAL" as Plan);
+  const planKey = prismaPlanToPlanKey(plan);
+  const trialDaysLeft = computeTrialDaysLeft(plan, subscription?.trialEndsAt);
+
+  const { callsUsed, managersUsed } = await getCompanyUsageCounts(
+    ctx?.user.companyId ?? null,
+  );
+
+  const statusBar = buildSubscriptionStatusBarModel({
+    plan: planKey,
+    subStatus: subscription?.status,
+    trialDaysLeft,
+    trialEndsAt: subscription?.trialEndsAt ?? null,
+    currentPeriodEnd: subscription?.currentPeriodEnd ?? null,
+    callsUsed,
+    managersUsed,
+    maxCalls: subscription?.maxCalls,
+    maxManagers: subscription?.maxManagers,
+  });
 
   return (
     <div className="flex h-screen min-h-screen w-full overflow-hidden bg-zinc-950 text-zinc-100">
@@ -56,8 +87,9 @@ export async function AppShell({
             })}
           </div>
         </nav>
-        <div className="shrink-0 border-t border-zinc-800 p-3">
-          <div className="mb-3 flex items-start justify-between gap-2">
+        <div className="shrink-0 space-y-3 border-t border-zinc-800 p-3">
+          <SubscriptionStatusBar {...statusBar} />
+          <div className="flex items-start justify-between gap-2">
             <p className="min-w-0 flex-1 truncate text-xs text-zinc-400">
               {userTitle}
             </p>

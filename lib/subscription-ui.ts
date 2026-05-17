@@ -1,5 +1,27 @@
-import type { PlanKey } from "@/lib/plans";
+import { PLANS, type PlanKey } from "@/lib/plans";
 import type { Plan, SubStatus } from "@prisma/client";
+
+export type SubscriptionStatusBarModel = {
+  planLabel: string;
+  termLine: string;
+  callsLine: string;
+  managersLine: string;
+  ctaLabel: string;
+  displayStatus: SubscriptionDisplayStatus;
+  soonEnding: boolean;
+};
+
+function formatRuDate(date: Date): string {
+  return date.toLocaleDateString("ru-RU", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+}
+
+function daysUntil(date: Date): number {
+  return Math.max(0, Math.ceil((date.getTime() - Date.now()) / 86400000));
+}
 
 export function prismaPlanToPlanKey(plan: Plan): PlanKey {
   if (plan === "START") {
@@ -104,4 +126,93 @@ export function deriveSubscriptionUi(sub: {
     bannerMessage,
     ctaLabel,
   };
+}
+
+export function buildSubscriptionStatusBarModel(input: {
+  plan: PlanKey;
+  subStatus: SubStatus | null | undefined;
+  trialDaysLeft: number;
+  trialEndsAt: Date | null;
+  currentPeriodEnd: Date | null;
+  callsUsed: number;
+  managersUsed: number;
+  maxCalls?: number | null;
+  maxManagers?: number | null;
+}): SubscriptionStatusBarModel {
+  const ui = deriveSubscriptionUi({
+    plan: input.plan,
+    subStatus: input.subStatus,
+    trialDaysLeft: input.trialDaysLeft,
+  });
+
+  const planDef = PLANS[input.plan];
+  const planLabel =
+    ui.displayStatus === "none"
+      ? "Нет тарифа"
+      : input.plan === "TRIAL"
+        ? "Пробный"
+        : (planDef?.label ?? input.plan);
+
+  const trialExpired = input.plan === "TRIAL" && input.trialDaysLeft === 0;
+  const isActivePaid =
+    input.subStatus === "ACTIVE" && input.plan !== "TRIAL";
+
+  let termLine = "Нет активного тарифа";
+  if (trialExpired) {
+    termLine = "Пробный период истёк";
+  } else if (ui.displayStatus === "expired" && !trialExpired) {
+    termLine = "Тариф истёк";
+  } else if (input.plan === "TRIAL" && input.trialDaysLeft > 0) {
+    termLine = `Осталось ${input.trialDaysLeft} дн.`;
+  } else if (isActivePaid && input.currentPeriodEnd) {
+    termLine = `Активен до ${formatRuDate(input.currentPeriodEnd)}`;
+  } else if (isActivePaid) {
+    termLine = "Активен";
+  }
+
+  const maxCalls = input.maxCalls ?? planDef?.maxCalls ?? null;
+  const maxManagers = input.maxManagers ?? planDef?.maxManagers ?? null;
+
+  const callsUnlimited =
+    input.plan === "BUSINESS" || maxCalls == null;
+  const callsLine = callsUnlimited
+    ? "Без лимита"
+    : `Загружено ${input.callsUsed} из ${maxCalls}`;
+
+  const managersLine =
+    maxManagers == null
+      ? "Без лимита"
+      : `${input.managersUsed} из ${maxManagers}`;
+
+  const paidDaysLeft = input.currentPeriodEnd
+    ? daysUntil(input.currentPeriodEnd)
+    : null;
+  const soonEnding =
+    (input.plan === "TRIAL" &&
+      input.trialDaysLeft > 0 &&
+      input.trialDaysLeft <= 3) ||
+    (isActivePaid &&
+      paidDaysLeft !== null &&
+      paidDaysLeft <= 3 &&
+      paidDaysLeft >= 0);
+
+  return {
+    planLabel,
+    termLine,
+    callsLine,
+    managersLine,
+    ctaLabel: ui.ctaLabel,
+    displayStatus: ui.displayStatus,
+    soonEnding,
+  };
+}
+
+export function computeTrialDaysLeft(
+  plan: Plan,
+  trialEndsAt: Date | null | undefined,
+): number {
+  if (plan !== "TRIAL" || !trialEndsAt) {
+    return 0;
+  }
+  return daysUntil(new Date(trialEndsAt));
 }
