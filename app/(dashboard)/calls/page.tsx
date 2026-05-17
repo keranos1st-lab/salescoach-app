@@ -2,6 +2,10 @@ import { CallsWorkspace, type CallListItem } from "./calls-workspace";
 import { AppShell } from "@/components/app-shell";
 import { companyProfileFromJson } from "@/lib/company-profile";
 import { getAuthContextLite } from "@/lib/get-auth-context-lite";
+import {
+  getAllowedManagersLimit,
+  getManagerLimitState,
+} from "@/lib/manager-limits";
 import { prisma } from "@/lib/prisma";
 import Link from "next/link";
 import { redirect } from "next/navigation";
@@ -57,6 +61,9 @@ export default async function CallsPage() {
     managers: row.manager ? { name: row.manager.name } : null,
   }));
 
+  const allowedManagers = getAllowedManagersLimit(ctx.subscription);
+  const managerLimit = getManagerLimitState(managers.length, allowedManagers);
+
   return (
     <AppShell activeHref="/calls">
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-8">
@@ -95,6 +102,7 @@ export default async function CallsPage() {
         <CallsWorkspace
           managers={managers}
           initialCalls={initialCalls}
+          managerLimit={managerLimit}
         />
       </main>
     </AppShell>

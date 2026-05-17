@@ -136,7 +136,10 @@ export default async function ProfilePage() {
         <Suspense fallback={null}>
           <ProfilePlansSection
             currentPlanKey={planLabelKey}
-            showDashboardLink={subscriptionUi.displayStatus === "active"}
+            showDashboardLink={
+              subscriptionUi.displayStatus === "active" ||
+              subscriptionUi.displayStatus === "trial"
+            }
           />
         </Suspense>
       </div>

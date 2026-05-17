@@ -9,6 +9,7 @@ import {
   useState,
   type DragEvent,
 } from "react";
+import type { ManagerLimitState } from "@/lib/manager-limits";
 
 export type ManagerOption = { id: string; name: string };
 
@@ -207,12 +208,19 @@ function ResultCard({ analysis }: { analysis: AnalysisResult | null | undefined 
   );
 }
 
+function callsAnalysisBlockedMessage(limit: ManagerLimitState): string | null {
+  if (!limit.overLimit) return null;
+  return `У вас ${limit.active} активных менеджеров, а текущий тариф позволяет только ${limit.allowed}. Удалите лишних менеджеров, чтобы продолжить анализ звонков.`;
+}
+
 export function CallsWorkspace({
   managers,
   initialCalls,
+  managerLimit,
 }: {
   managers: ManagerOption[];
   initialCalls: CallListItem[];
+  managerLimit: ManagerLimitState;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -234,6 +242,7 @@ export function CallsWorkspace({
   }, [initialCalls]);
 
   const pickFile = useCallback((f: File | null | undefined) => {
+    if (managerLimit.overLimit) return;
     if (!f || !f.size) return;
     if (!f.type.startsWith("audio/")) {
       setError("Нужен аудиофайл (например mp3, wav, webm)");
@@ -242,7 +251,7 @@ export function CallsWorkspace({
     setError(null);
     setFile(f);
     setResult(null);
-  }, []);
+  }, [managerLimit.overLimit]);
 
   const onDrop = useCallback(
     (e: DragEvent) => {
@@ -263,8 +272,11 @@ export function CallsWorkspace({
     setDragOver(false);
   }, []);
 
+  const analysisBlockedMessage = callsAnalysisBlockedMessage(managerLimit);
+  const analysisBlocked = managerLimit.overLimit;
+
   async function analyze() {
-    if (!file || !managerId) return;
+    if (analysisBlocked || !file || !managerId) return;
     setLoading(true);
     setError(null);
     try {
@@ -326,7 +338,9 @@ export function CallsWorkspace({
     }
   }
 
-  const canAnalyze = Boolean(file && managerId && !loading);
+  const canAnalyze = Boolean(
+    !analysisBlocked && file && managerId && !loading,
+  );
   const managerFilterOptions = useMemo(() => {
     const uniq = Array.from(
       new Set(calls.map((call) => call.managers?.name?.trim()).filter(Boolean))
@@ -347,6 +361,15 @@ export function CallsWorkspace({
         </p>
       </header>
 
+      {analysisBlockedMessage ? (
+        <p
+          className="rounded-lg border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-300"
+          role="alert"
+        >
+          {analysisBlockedMessage}
+        </p>
+      ) : null}
+
       {managers.length === 0 ? (
         <div className="rounded-xl border border-amber-900/50 bg-amber-950/30 px-4 py-3 text-sm text-amber-200/90">
           Сначала добавьте менеджеров в разделе «Менеджеры», чтобы привязать звонок.
@@ -354,22 +377,28 @@ export function CallsWorkspace({
       ) : null}
 
       <div
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === "Enter" || e.key === " ") {
-            e.preventDefault();
-            inputRef.current?.click();
-          }
-        }}
-        onDrop={onDrop}
-        onDragOver={onDragOver}
-        onDragLeave={onDragLeave}
-        onClick={() => inputRef.current?.click()}
-        className={`cursor-pointer rounded-2xl border-2 border-dashed px-6 py-14 text-center transition ${
-          dragOver
-            ? "border-[#0d9488] bg-[#0d9488]/10"
-            : "border-zinc-700 bg-zinc-900/40 hover:border-zinc-600 hover:bg-zinc-900/60"
+        role={analysisBlocked ? undefined : "button"}
+        tabIndex={analysisBlocked ? undefined : 0}
+        onKeyDown={
+          analysisBlocked
+            ? undefined
+            : (e) => {
+                if (e.key === "Enter" || e.key === " ") {
+                  e.preventDefault();
+                  inputRef.current?.click();
+                }
+              }
+        }
+        onDrop={analysisBlocked ? undefined : onDrop}
+        onDragOver={analysisBlocked ? undefined : onDragOver}
+        onDragLeave={analysisBlocked ? undefined : onDragLeave}
+        onClick={analysisBlocked ? undefined : () => inputRef.current?.click()}
+        className={`rounded-2xl border-2 border-dashed px-6 py-14 text-center transition ${
+          analysisBlocked
+            ? "cursor-not-allowed border-zinc-800 bg-zinc-900/20 opacity-50"
+            : dragOver
+              ? "cursor-pointer border-[#0d9488] bg-[#0d9488]/10"
+              : "cursor-pointer border-zinc-700 bg-zinc-900/40 hover:border-zinc-600 hover:bg-zinc-900/60"
         }`}
       >
         <input
@@ -377,6 +406,7 @@ export function CallsWorkspace({
           type="file"
           accept="audio/*"
           className="hidden"
+          disabled={analysisBlocked}
           onChange={(e) => pickFile(e.target.files?.[0])}
         />
         <p className="text-sm font-medium text-zinc-200">
@@ -398,7 +428,7 @@ export function CallsWorkspace({
           id="manager"
           value={managerId}
           onChange={(e) => setManagerId(e.target.value)}
-          disabled={managers.length === 0}
+          disabled={managers.length === 0 || analysisBlocked}
           className="w-full rounded-xl border border-zinc-700 bg-zinc-950 px-4 py-3 text-sm text-zinc-100 outline-none focus:border-[#0d9488] focus:ring-2 focus:ring-[#0d9488]/25 disabled:opacity-50"
         >
           <option value="">Выберите менеджера</option>
