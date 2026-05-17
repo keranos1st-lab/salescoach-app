@@ -25,12 +25,23 @@ export function SubscriptionStatusBar({
   termLine,
   callsLine,
   managersLine,
+  managersOverLimit,
+  managersWarning,
   ctaLabel,
   displayStatus,
   soonEnding,
 }: SubscriptionStatusBarProps) {
   return (
     <div className="rounded-xl border border-zinc-700/80 bg-zinc-950/80 p-3">
+      {managersWarning ? (
+        <p
+          role="alert"
+          className="mb-2.5 rounded-lg border border-red-900/50 bg-red-950/40 px-2.5 py-2 text-[10px] leading-snug text-red-300"
+        >
+          {managersWarning}
+        </p>
+      ) : null}
+
       <div className="flex flex-col gap-2 sm:flex-row sm:flex-wrap sm:items-start sm:justify-between">
         <div className="min-w-0 flex-1 space-y-1">
           <div className="flex flex-wrap items-center gap-1.5">
@@ -49,14 +60,22 @@ export function SubscriptionStatusBar({
           ) : null}
         </div>
 
-        <div className="grid w-full grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-zinc-500 lg:w-auto lg:min-w-[140px]">
+        <div className="grid w-full grid-cols-2 gap-x-3 gap-y-1 text-[11px] text-zinc-500 sm:w-auto sm:min-w-[140px]">
           <div>
             <span className="block text-zinc-600">Звонки</span>
             <span className="text-zinc-300">{callsLine}</span>
           </div>
           <div>
             <span className="block text-zinc-600">Менеджеры</span>
-            <span className="text-zinc-300">{managersLine}</span>
+            <span
+              className={
+                managersOverLimit
+                  ? "font-medium text-red-400"
+                  : "text-zinc-300"
+              }
+            >
+              {managersLine}
+            </span>
           </div>
         </div>
       </div>

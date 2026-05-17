@@ -1,6 +1,10 @@
 import { ManagersWorkspace, type ManagerRow } from "./managers-workspace";
 import { AppShell } from "@/components/app-shell";
 import { getAuthContext } from "@/lib/get-auth-context";
+import {
+  getAllowedManagersLimit,
+  getManagerLimitState,
+} from "@/lib/manager-limits";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 
@@ -63,10 +67,19 @@ export default async function ManagersPage() {
     };
   });
 
+  const allowedManagers = getAllowedManagersLimit(ctx.subscription);
+  const managerLimit = getManagerLimitState(
+    initialManagers.length,
+    allowedManagers,
+  );
+
   return (
     <AppShell activeHref="/managers">
       <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-8">
-        <ManagersWorkspace initialManagers={initialManagers} />
+        <ManagersWorkspace
+          initialManagers={initialManagers}
+          managerLimit={managerLimit}
+        />
       </main>
     </AppShell>
   );

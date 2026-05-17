@@ -5,6 +5,11 @@ import { ProfilePlansSection } from "@/components/profile/ProfilePlansSection";
 import { SubscriptionManagement } from "@/components/profile/SubscriptionManagement";
 import { getAuthContextLite } from "@/lib/get-auth-context-lite";
 import { PLANS, type PlanKey } from "@/lib/plans";
+import {
+  getAllowedManagersLimit,
+  getManagerLimitState,
+  managersLimitLine,
+} from "@/lib/manager-limits";
 import { deriveSubscriptionUi } from "@/lib/subscription-ui";
 import { prisma } from "@/lib/prisma";
 import type { Plan, Subscription } from "@prisma/client";
@@ -65,7 +70,8 @@ export default async function ProfilePage() {
     plan === "BUSINESS" || maxCallsFallback == null
       ? "∞"
       : String(subscription?.maxCalls ?? maxCallsFallback);
-  const maxManagers = subscription?.maxManagers ?? PLANS[planLabelKey].maxManagers;
+  const allowedManagers = getAllowedManagersLimit(subscription);
+  const managerLimit = getManagerLimitState(managersUsed, allowedManagers);
 
   const trialEndsAt = subscription?.trialEndsAt ?? null;
   let trialDaysLeft = 0;
@@ -112,14 +118,26 @@ export default async function ProfilePage() {
             <p>
               Звонки: {subUsage?.callsUsed ?? callsUsed} / {maxCallsDisplay}
             </p>
-            <p>
-              Менеджеры: {subUsage?.managersUsed ?? managersUsed} / {maxManagers}
+            <p className={managerLimit.overLimit ? "text-red-400" : undefined}>
+              Менеджеры:{" "}
+              {managersLimitLine(
+                subUsage?.managersUsed ?? managersUsed,
+                allowedManagers,
+              )}
             </p>
+            {managerLimit.warningMessage ? (
+              <p className="text-sm text-red-400" role="alert">
+                {managerLimit.warningMessage}
+              </p>
+            ) : null}
           </div>
         </section>
 
         <Suspense fallback={null}>
-          <ProfilePlansSection currentPlanKey={planLabelKey} />
+          <ProfilePlansSection
+            currentPlanKey={planLabelKey}
+            showDashboardLink={subscriptionUi.displayStatus === "active"}
+          />
         </Suspense>
       </div>
       <Suspense fallback={null}>

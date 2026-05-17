@@ -1,6 +1,10 @@
 import { Role } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { getAuthContext } from "@/lib/get-auth-context";
+import {
+  getAllowedManagersLimit,
+  getManagerLimitState,
+} from "@/lib/manager-limits";
 import { prisma } from "@/lib/prisma";
 
 export const runtime = "nodejs";
@@ -61,11 +65,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const maxManagers = ctx.subscription?.maxManagers ?? 2;
-    if (ctx.managers.length >= maxManagers) {
+    const allowed = getAllowedManagersLimit(ctx.subscription);
+    const activeCount = ctx.managers.length;
+    const limit = getManagerLimitState(activeCount, allowed);
+    if (limit.atOrOverLimit) {
       return NextResponse.json(
-        { error: "Превышен лимит менеджеров по тарифу" },
-        { status: 403 }
+        { error: limit.createBlockedMessage },
+        { status: 403 },
       );
     }
 

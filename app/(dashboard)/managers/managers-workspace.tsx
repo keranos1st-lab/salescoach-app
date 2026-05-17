@@ -3,6 +3,7 @@
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useMemo, useState } from "react";
+import type { ManagerLimitState } from "@/lib/manager-limits";
 
 export type ManagerRow = {
   id: string;
@@ -18,8 +19,10 @@ function formatDate(value: string) {
 
 export function ManagersWorkspace({
   initialManagers,
+  managerLimit,
 }: {
   initialManagers: ManagerRow[];
+  managerLimit: ManagerLimitState;
 }) {
   const router = useRouter();
   const [managers, setManagers] = useState<ManagerRow[]>(initialManagers);
@@ -40,10 +43,31 @@ export function ManagersWorkspace({
     [managers]
   );
 
+  function tryOpenAddModal() {
+    if (managerLimit.atOrOverLimit) {
+      const msg =
+        managerLimit.warningMessage ?? managerLimit.createBlockedMessage;
+      window.alert(msg);
+      return;
+    }
+    setError(null);
+    setName("");
+    setPhone("");
+    setTitle("");
+    setModalOpen(true);
+  }
+
   async function createManager() {
     const trimmed = name.trim();
     if (!trimmed) {
       setError("Введите имя менеджера");
+      return;
+    }
+
+    if (managerLimit.atOrOverLimit) {
+      setError(
+        managerLimit.warningMessage ?? managerLimit.createBlockedMessage,
+      );
       return;
     }
 
@@ -132,18 +156,27 @@ export function ManagersWorkspace({
         </div>
         <button
           type="button"
-          onClick={() => {
-            setError(null);
-            setName("");
-            setPhone("");
-            setTitle("");
-            setModalOpen(true);
-          }}
-          className="rounded-xl bg-[#0d9488] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#0d9488]/25 transition hover:bg-[#0f766e]"
+          onClick={tryOpenAddModal}
+          disabled={managerLimit.atOrOverLimit}
+          title={
+            managerLimit.atOrOverLimit
+              ? (managerLimit.warningMessage ?? managerLimit.createBlockedMessage)
+              : undefined
+          }
+          className="rounded-xl bg-[#0d9488] px-4 py-2.5 text-sm font-semibold text-white shadow-lg shadow-[#0d9488]/25 transition hover:bg-[#0f766e] disabled:cursor-not-allowed disabled:opacity-50"
         >
           Добавить менеджера
         </button>
       </header>
+
+      {managerLimit.warningMessage ? (
+        <p
+          className="rounded-lg border border-red-900/50 bg-red-950/40 px-3 py-2 text-sm text-red-300"
+          role="alert"
+        >
+          {managerLimit.warningMessage}
+        </p>
+      ) : null}
 
       {error ? (
         <p

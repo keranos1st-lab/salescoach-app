@@ -1,4 +1,8 @@
 import { PLANS, type PlanKey } from "@/lib/plans";
+import {
+  getManagerLimitState,
+  managersLimitLine,
+} from "@/lib/manager-limits";
 import type { Plan, SubStatus } from "@prisma/client";
 
 export type SubscriptionStatusBarModel = {
@@ -6,6 +10,8 @@ export type SubscriptionStatusBarModel = {
   termLine: string;
   callsLine: string;
   managersLine: string;
+  managersOverLimit: boolean;
+  managersWarning: string | null;
   ctaLabel: string;
   displayStatus: SubscriptionDisplayStatus;
   soonEnding: boolean;
@@ -179,10 +185,15 @@ export function buildSubscriptionStatusBarModel(input: {
     ? "Без лимита"
     : `Загружено ${input.callsUsed} из ${maxCalls}`;
 
+  const managerLimit =
+    maxManagers == null
+      ? null
+      : getManagerLimitState(input.managersUsed, maxManagers);
+
   const managersLine =
     maxManagers == null
       ? "Без лимита"
-      : `${input.managersUsed} из ${maxManagers}`;
+      : managersLimitLine(input.managersUsed, maxManagers);
 
   const paidDaysLeft = input.currentPeriodEnd
     ? daysUntil(input.currentPeriodEnd)
@@ -201,6 +212,8 @@ export function buildSubscriptionStatusBarModel(input: {
     termLine,
     callsLine,
     managersLine,
+    managersOverLimit: managerLimit?.overLimit ?? false,
+    managersWarning: managerLimit?.warningMessage ?? null,
     ctaLabel: ui.ctaLabel,
     displayStatus: ui.displayStatus,
     soonEnding,
