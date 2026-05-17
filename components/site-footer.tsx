@@ -25,14 +25,21 @@ export function SiteFooter() {
       <div className="mt-8 border-t border-zinc-800 py-4">
         <p className="footer-studio-credit text-center text-xs text-zinc-500">
           © 2026 SalesCoach | Разработано{" "}
-          <Image
-            src="/vizi-studio-logo.png"
-            alt="Vizi Studio"
-            width={40}
-            height={40}
-            className="mx-1 inline-block align-middle"
-          />
-          <span>Vizi Studio</span>
+          <Link
+            href="https://vizistudio.ru"
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 align-middle transition hover:text-teal-300"
+          >
+            <Image
+              src="/vizi-studio-logo.png"
+              alt="Vizi Studio"
+              width={40}
+              height={40}
+              className="inline-block"
+            />
+            <span>Vizi Studio</span>
+          </Link>
         </p>
       </div>
     </footer>
