@@ -1,5 +1,9 @@
 import { Role } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
+import {
+  assertProductAccess,
+  isProductAccessDenied,
+} from "@/lib/assert-product-access";
 import { getAuthContext } from "@/lib/get-auth-context";
 import {
   getAllowedManagersLimit,
@@ -63,6 +67,15 @@ export async function POST(request: NextRequest) {
         { error: "К аккаунту не привязана компания" },
         { status: 400 }
       );
+    }
+
+    try {
+      assertProductAccess(ctx.subscription);
+    } catch (e) {
+      if (isProductAccessDenied(e)) {
+        return NextResponse.json({ error: e.message }, { status: 403 });
+      }
+      throw e;
     }
 
     const allowed = getAllowedManagersLimit(ctx.subscription);

@@ -3,6 +3,10 @@ import {
   companyProfileFromJson,
   type CompanyProfile,
 } from "@/lib/company-profile";
+import {
+  assertProductAccess,
+  isProductAccessDenied,
+} from "@/lib/assert-product-access";
 import { getMonthlyCallLimitStateForCompany } from "@/lib/call-limits";
 import { getAuthContextLite } from "@/lib/get-auth-context-lite";
 import { prisma } from "@/lib/prisma";
@@ -218,6 +222,15 @@ export async function POST(request: NextRequest) {
       "[calls/analyze] SUPABASE_STORAGE_CALLS_BUCKET JSON:",
       JSON.stringify(process.env.SUPABASE_STORAGE_CALLS_BUCKET ?? null)
     );
+
+    try {
+      assertProductAccess(ctx.subscription);
+    } catch (e) {
+      if (isProductAccessDenied(e)) {
+        return NextResponse.json({ error: e.message }, { status: 403 });
+      }
+      throw e;
+    }
 
     const callLimit = await getMonthlyCallLimitStateForCompany(
       companyId,

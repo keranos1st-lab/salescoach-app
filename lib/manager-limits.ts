@@ -14,6 +14,8 @@ export type SubscriptionLimitsSource = {
   maxManagers?: number | null;
   maxCalls?: number | null;
   status?: SubStatus | null;
+  currentPeriodEnd?: Date | null;
+  trialEndsAt?: Date | null;
 } | null;
 
 /**

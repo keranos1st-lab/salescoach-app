@@ -49,11 +49,26 @@ export function getProductAccessBlock(sub: {
   plan: PlanKey;
   subStatus: SubStatus | null | undefined;
   trialDaysLeft: number;
+  currentPeriodEnd?: Date | null;
 }): {
   blocked: boolean;
   title: string;
   message: string;
 } {
+  const isTrialPlan = sub.plan === "TRIAL";
+  if (
+    !isTrialPlan &&
+    sub.subStatus === "ACTIVE" &&
+    sub.currentPeriodEnd != null &&
+    new Date(sub.currentPeriodEnd) < new Date()
+  ) {
+    return {
+      blocked: true,
+      title: "Срок тарифа истёк",
+      message: "Выберите тариф, чтобы продолжить пользоваться сервисом",
+    };
+  }
+
   const ui = deriveSubscriptionUi(sub);
 
   if (!ui.showBanner) {

@@ -7,6 +7,10 @@ import {
   companyProfileToJson,
   type CompanyProfile,
 } from "@/lib/company-profile";
+import {
+  assertProductAccess,
+  isProductAccessDenied,
+} from "@/lib/assert-product-access";
 import { getAuthContextLite } from "@/lib/get-auth-context-lite";
 import { prisma } from "@/lib/prisma";
 import { callWormsoftCompanyProfile, WormsoftError } from "@/lib/wormsoft-client";
@@ -67,6 +71,15 @@ export async function POST(request: NextRequest) {
     const ctx = await getAuthContextLite();
     if (!ctx?.user.companyId) {
       return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
+    }
+
+    try {
+      assertProductAccess(ctx.subscription);
+    } catch (e) {
+      if (isProductAccessDenied(e)) {
+        return NextResponse.json({ error: e.message }, { status: 403 });
+      }
+      throw e;
     }
 
     const companyId = ctx.user.companyId;

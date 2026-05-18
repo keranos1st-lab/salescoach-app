@@ -1,3 +1,7 @@
+import {
+  assertProductAccess,
+  isProductAccessDenied,
+} from "@/lib/assert-product-access";
 import { getAuthContextLite } from "@/lib/get-auth-context-lite";
 import {
   companyProfileFromJson,
@@ -24,6 +28,15 @@ export async function POST(request: NextRequest) {
     const ctx = await getAuthContextLite();
     if (!ctx?.user.companyId) {
       return NextResponse.json({ error: "Нужна авторизация" }, { status: 401 });
+    }
+
+    try {
+      assertProductAccess(ctx.subscription);
+    } catch (e) {
+      if (isProductAccessDenied(e)) {
+        return NextResponse.json({ error: e.message }, { status: 403 });
+      }
+      throw e;
     }
 
     const companyId = ctx.user.companyId;

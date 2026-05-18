@@ -36,6 +36,7 @@ export default async function DashboardLayout({
     plan: planKey,
     subStatus: subscription?.status,
     trialDaysLeft,
+    currentPeriodEnd: subscription?.currentPeriodEnd ?? null,
   });
 
   return (
