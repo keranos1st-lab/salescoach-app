@@ -26,7 +26,7 @@ export type SubscriptionStatusBarModel = {
   soonEnding: boolean;
 };
 
-function formatRuDate(date: Date): string {
+export function formatRuDate(date: Date): string {
   return date.toLocaleDateString("ru-RU", {
     day: "numeric",
     month: "long",
@@ -55,20 +55,6 @@ export function getProductAccessBlock(sub: {
   title: string;
   message: string;
 } {
-  const isTrialPlan = sub.plan === "TRIAL";
-  if (
-    !isTrialPlan &&
-    sub.subStatus === "ACTIVE" &&
-    sub.currentPeriodEnd != null &&
-    new Date(sub.currentPeriodEnd) < new Date()
-  ) {
-    return {
-      blocked: true,
-      title: "Срок тарифа истёк",
-      message: "Выберите тариф, чтобы продолжить пользоваться сервисом",
-    };
-  }
-
   const ui = deriveSubscriptionUi(sub);
 
   if (!ui.showBanner) {
@@ -95,6 +81,7 @@ export function deriveSubscriptionUi(sub: {
   plan: PlanKey;
   subStatus: SubStatus | null | undefined;
   trialDaysLeft: number;
+  currentPeriodEnd?: Date | null;
 }): {
   displayStatus: SubscriptionDisplayStatus;
   statusLabel: string;
@@ -102,9 +89,14 @@ export function deriveSubscriptionUi(sub: {
   bannerMessage: string;
   ctaLabel: string;
 } {
-  const { plan, subStatus, trialDaysLeft } = sub;
+  const { plan, subStatus, trialDaysLeft, currentPeriodEnd } = sub;
   const isTrialPlan = plan === "TRIAL";
   const isActivePaid = subStatus === "ACTIVE" && !isTrialPlan;
+  const paidPeriodExpired =
+    isActivePaid &&
+    currentPeriodEnd != null &&
+    new Date(currentPeriodEnd) < new Date();
+  const effectivelyActivePaid = isActivePaid && !paidPeriodExpired;
   const trialExpired = isTrialPlan && trialDaysLeft === 0;
   const subExpired =
     subStatus === "EXPIRED" ||
@@ -112,11 +104,11 @@ export function deriveSubscriptionUi(sub: {
     subStatus === "PAST_DUE";
 
   let displayStatus: SubscriptionDisplayStatus = "none";
-  if (isActivePaid) {
+  if (effectivelyActivePaid) {
     displayStatus = "active";
   } else if (isTrialPlan && trialDaysLeft > 0) {
     displayStatus = "trial";
-  } else if (trialExpired || subExpired) {
+  } else if (trialExpired || subExpired || paidPeriodExpired) {
     displayStatus = "expired";
   } else if (isTrialPlan) {
     displayStatus = "trial";
@@ -133,19 +125,24 @@ export function deriveSubscriptionUi(sub: {
   if (trialExpired) {
     bannerMessage =
       "Пробный период закончился. Выберите тариф, чтобы продолжить работу.";
-  } else if (subExpired && !isTrialPlan) {
+  } else if (paidPeriodExpired || (subExpired && !isTrialPlan)) {
     bannerMessage =
       "Срок тарифа закончился. Продлите подписку, чтобы сохранить доступ.";
   } else if (displayStatus === "none") {
     bannerMessage = "У вас нет активного тарифа. Выберите подходящий план.";
   }
 
-  const showBanner = trialExpired || subExpired || displayStatus === "none";
+  const showBanner =
+    trialExpired || subExpired || paidPeriodExpired || displayStatus === "none";
 
   let ctaLabel = "Выбрать тариф";
-  if (isActivePaid) {
+  if (effectivelyActivePaid) {
     ctaLabel = "Сменить тариф";
-  } else if (trialExpired || (subExpired && !isTrialPlan)) {
+  } else if (
+    trialExpired ||
+    paidPeriodExpired ||
+    (subExpired && !isTrialPlan)
+  ) {
     ctaLabel = "Продлить тариф";
   }
 
@@ -173,6 +170,7 @@ export function buildSubscriptionStatusBarModel(input: {
     plan: input.plan,
     subStatus: input.subStatus,
     trialDaysLeft: input.trialDaysLeft,
+    currentPeriodEnd: input.currentPeriodEnd,
   });
 
   const planDef = PLANS[input.plan];

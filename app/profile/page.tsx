@@ -15,7 +15,11 @@ import {
   getManagerLimitState,
   managersLimitLine,
 } from "@/lib/manager-limits";
-import { deriveSubscriptionUi } from "@/lib/subscription-ui";
+import {
+  deriveSubscriptionUi,
+  formatRuDate,
+  prismaPlanToPlanKey,
+} from "@/lib/subscription-ui";
 import { prisma } from "@/lib/prisma";
 import type { Plan, Subscription } from "@prisma/client";
 import { redirect } from "next/navigation";
@@ -24,13 +28,6 @@ type SubscriptionWithUsage = Subscription & {
   callsUsed?: number | null;
   managersUsed?: number | null;
 };
-
-function prismaPlanToPlanKey(plan: Plan): PlanKey {
-  if (plan === "START") {
-    return "STARTER";
-  }
-  return plan as PlanKey;
-}
 
 export default async function ProfilePage() {
   const ctx = await getAuthContextLite();
@@ -87,14 +84,22 @@ export default async function ProfilePage() {
     );
   }
 
+  const currentPeriodEnd = subscription?.currentPeriodEnd ?? null;
+
   const subscriptionUi = deriveSubscriptionUi({
     plan: planLabelKey,
     subStatus: subscription?.status,
     trialDaysLeft,
+    currentPeriodEnd,
   });
 
   const trialDaysLeftDisplay =
     plan === "TRIAL" && trialEndsAt ? trialDaysLeft : null;
+
+  const activeUntilLine =
+    subscriptionUi.displayStatus === "active" && currentPeriodEnd
+      ? `Активен до ${formatRuDate(new Date(currentPeriodEnd))}`
+      : null;
 
   return (
     <main className="min-h-screen bg-zinc-950 px-4 py-10 text-zinc-100">
@@ -112,6 +117,7 @@ export default async function ProfilePage() {
           displayStatus={subscriptionUi.displayStatus}
           statusLabel={subscriptionUi.statusLabel}
           trialDaysLeft={trialDaysLeftDisplay}
+          activeUntilLine={activeUntilLine}
           showBanner={subscriptionUi.showBanner}
           bannerMessage={subscriptionUi.bannerMessage}
           ctaLabel={subscriptionUi.ctaLabel}

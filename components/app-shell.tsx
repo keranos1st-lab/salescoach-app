@@ -18,6 +18,7 @@ const nav = [
   { href: "/managers", label: "Менеджеры" },
   { href: "/reports", label: "Отчеты" },
   { href: "/product", label: "Продукт 📦" },
+  { href: "/profile", label: "Профиль" },
 ] as const;
 
 export async function AppShell({

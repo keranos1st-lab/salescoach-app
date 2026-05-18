@@ -1,18 +1,25 @@
 "use client";
-import { useEffect, useState } from "react";
-import { useSearchParams } from "next/navigation";
+import { useEffect, useRef, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
 export function PaymentToast() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [visible, setVisible] = useState(false);
+  const refreshed = useRef(false);
 
   useEffect(() => {
-    if (searchParams.get("payment") === "success") {
-      setVisible(true);
-      const timer = setTimeout(() => setVisible(false), 5000);
-      return () => clearTimeout(timer);
+    if (searchParams.get("payment") !== "success") return;
+
+    setVisible(true);
+    if (!refreshed.current) {
+      refreshed.current = true;
+      router.refresh();
     }
-  }, [searchParams]);
+
+    const timer = setTimeout(() => setVisible(false), 5000);
+    return () => clearTimeout(timer);
+  }, [searchParams, router]);
 
   if (!visible) return null;
 

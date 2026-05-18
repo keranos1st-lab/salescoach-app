@@ -9,6 +9,7 @@ type SubscriptionManagementProps = {
   displayStatus: SubscriptionDisplayStatus;
   statusLabel: string;
   trialDaysLeft: number | null;
+  activeUntilLine: string | null;
   showBanner: boolean;
   bannerMessage: string;
   ctaLabel: string;
@@ -39,6 +40,7 @@ export function SubscriptionManagement({
   displayStatus,
   statusLabel,
   trialDaysLeft,
+  activeUntilLine,
   showBanner,
   bannerMessage,
   ctaLabel,
@@ -80,6 +82,9 @@ export function SubscriptionManagement({
                 Осталось {trialDaysLeft} дн. пробного периода
               </p>
             )
+          ) : null}
+          {activeUntilLine ? (
+            <p className="text-emerald-400">{activeUntilLine}</p>
           ) : null}
         </div>
         <button
