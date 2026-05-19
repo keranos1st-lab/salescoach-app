@@ -12,11 +12,15 @@ import {
   isProductAccessDenied,
 } from "@/lib/assert-product-access";
 import { getAuthContextLite } from "@/lib/get-auth-context-lite";
+import {
+  OpenAICallAnalysisError,
+  parseCompanyProfileWithOpenAI,
+  requireOpenAIApiKey,
+} from "@/lib/openai-call-analysis";
 import { prisma } from "@/lib/prisma";
-import { callWormsoftCompanyProfile, WormsoftError } from "@/lib/wormsoft-client";
 import type { CompanyProfileResponse } from "@/lib/wormsoft-types";
 
-/** Без Wormsoft: только эвристики по тексту страницы (parseSiteTextToProfile и merge). */
+/** Без OpenAI: только эвристики по тексту страницы (parseSiteTextToProfile и merge). */
 const EMPTY_AI_PROFILE: CompanyProfileResponse = {
   niche: null,
   services: [],
@@ -50,7 +54,7 @@ const COMPANY_PROFILE_JSON_SCHEMA = `{
   "anti_ideal_clients": string | null // кого компания не хочет видеть клиентами
 }`;
 
-const SYSTEM_PARSE_SITE = `Ты — опытный маркетолог и продуктолог. Твоя задача — по тексту сайта компании заполнить структуру профиля бизнеса для CRM-системы SalesCoach. Всегда отвечай строго валидным JSON без пояснений и без форматирования маркдауном. Если каких-то данных нет в тексте, ставь null или пустой массив.`;
+const SYSTEM_PARSE_SITE = `Ты — опытный маркетолог и продуктолог. Твоя задача — по тексту сайта компании заполнить структуру профиля бизнеса для CRM-системы SalesCoach. Всегда отвечай строго валидным JSON-объектом без пояснений и без markdown. Если каких-то данных нет в тексте, ставь null или пустой массив.`;
 
 function stripTags(input: string) {
   return input
@@ -173,22 +177,19 @@ ${htmlForModel}
 На основе этого заполни JSON со следующей структурой (типы полей):
 ${COMPANY_PROFILE_JSON_SCHEMA}`;
 
-    const wormsoftKey = process.env.WORMSOFT_API_KEY?.trim();
-    const useWormsoftAi =
-      Boolean(wormsoftKey) &&
-      wormsoftKey !== "test_key_for_local_development";
+    const useOpenAi = Boolean(requireOpenAIApiKey());
     let aiProfile: CompanyProfileResponse;
 
-    if (!useWormsoftAi) {
+    if (!useOpenAi) {
       aiProfile = EMPTY_AI_PROFILE;
     } else {
       try {
-        aiProfile = await callWormsoftCompanyProfile({
+        aiProfile = await parseCompanyProfileWithOpenAI({
           system: SYSTEM_PARSE_SITE,
           user: userPrompt,
         });
       } catch (e) {
-        if (e instanceof WormsoftError) {
+        if (e instanceof OpenAICallAnalysisError) {
           return NextResponse.json({ error: e.message }, { status: 502 });
         }
         throw e;
