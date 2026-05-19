@@ -1,4 +1,5 @@
 import { AppShell } from "@/components/app-shell";
+import { RiskMap } from "./risk-map";
 import { ScoreTrendChart } from "./score-trend-chart";
 import { getAuthContext } from "@/lib/get-auth-context";
 import { prisma } from "@/lib/prisma";
@@ -119,6 +120,8 @@ export default async function DashboardPage() {
             )}
           </div>
         </section>
+
+        <RiskMap />
 
         <section className="mt-10">
           <h2 className="text-lg font-semibold text-zinc-100">Динамика среднего балла</h2>

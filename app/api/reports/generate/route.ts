@@ -11,7 +11,46 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 export const preferredRegion = "iad1";
 
+export const REPORT_RISK_ID_CATALOG = [
+  {
+    id: "price_objection_handling",
+    description: "проблемы с отработкой возражений по цене",
+  },
+  { id: "upsell_missed", description: "не использует допродажи" },
+  {
+    id: "competitor_positioning_weak",
+    description: "слабая отстройка от конкурентов",
+  },
+  { id: "discovery_shallow", description: "поверхностно выявляет потребности" },
+  {
+    id: "next_steps_unclear",
+    description: "не фиксирует чёткий следующий шаг",
+  },
+  {
+    id: "script_structure_weak",
+    description: "не держит структуру разговора",
+  },
+  { id: "rapport_weak", description: "плохо выстраивает контакт" },
+  {
+    id: "talk_ratio_high",
+    description: "слишком много говорит, мало слушает",
+  },
+  {
+    id: "followup_missing",
+    description: "не договаривается о продолжении контакта",
+  },
+  { id: "other", description: "прочий риск, не попавший в каталог" },
+] as const;
+
+export type ReportRiskId = (typeof REPORT_RISK_ID_CATALOG)[number]["id"];
+
+export type ReportRiskItem = {
+  risk_id: string;
+  text: string;
+};
+
 export type ManagerRiskAction = {
+  risk_id: string;
   risk: string;
   actions: string[];
 };
@@ -23,13 +62,88 @@ type ReportJson = {
   period_score: number | null;
   summary: string;
   strengths: string[];
-  weaknesses: string[];
+  weaknesses: ReportRiskItem[];
   coaching_focus: string[];
   skill_breakdown: SkillBreakdownItem[];
-  repeated_patterns: string[];
+  repeated_patterns: ReportRiskItem[];
   manager_notes: string[];
   manager_risk_actions: ManagerRiskActionsMap;
 };
+
+const ALLOWED_REPORT_RISK_IDS = new Set<string>(
+  REPORT_RISK_ID_CATALOG.map((item) => item.id),
+);
+
+function formatRiskIdCatalogForPrompt(): string {
+  return REPORT_RISK_ID_CATALOG.map(
+    (item) => `- ${item.id} — ${item.description}`,
+  ).join("\n");
+}
+
+function normalizeRiskId(value: unknown): string {
+  const id = typeof value === "string" ? value.trim() : "";
+  return ALLOWED_REPORT_RISK_IDS.has(id) ? id : "other";
+}
+
+function inferRiskIdFromText(text: string): string {
+  const t = normalize(text);
+  if (/цен|стоим|скидк|возраж|дорого/.test(t)) return "price_objection_handling";
+  if (/допрод|апсел|дополнительн/.test(t)) return "upsell_missed";
+  if (/конкурент|отстрой|утп|преимущ/.test(t)) return "competitor_positioning_weak";
+  if (/потребност|квалиф|выявл|запрос клиента/.test(t)) return "discovery_shallow";
+  if (/следующ|шаг|назнач|зафиксир|дожим/.test(t)) return "next_steps_unclear";
+  if (/структур|дисциплин/.test(t)) return "script_structure_weak";
+  if (/контакт|rapport|доверие/.test(t)) return "rapport_weak";
+  if (/много говорит|слушает мало|talk ratio/.test(t)) return "talk_ratio_high";
+  if (/follow|продолжен|перезвон|связаться/.test(t)) return "followup_missing";
+  return "other";
+}
+
+function toRiskItem(text: string, riskId?: string): ReportRiskItem {
+  const trimmed = text.trim();
+  return {
+    risk_id: riskId ? normalizeRiskId(riskId) : inferRiskIdFromText(trimmed),
+    text: trimmed,
+  };
+}
+
+function parseRiskItems(value: unknown, fieldName: string): ReportRiskItem[] {
+  if (!Array.isArray(value)) return [];
+
+  const result: ReportRiskItem[] = [];
+  let legacyFormat = false;
+
+  for (const item of value.slice(0, 8)) {
+    if (typeof item === "string") {
+      legacyFormat = true;
+      const text = item.trim();
+      if (text) result.push(toRiskItem(text));
+      continue;
+    }
+    if (typeof item === "object" && item !== null) {
+      const row = item as Record<string, unknown>;
+      const text =
+        typeof row.text === "string"
+          ? row.text.trim()
+          : typeof row.risk === "string"
+            ? row.risk.trim()
+            : "";
+      if (!text) continue;
+      result.push({
+        risk_id: normalizeRiskId(row.risk_id),
+        text,
+      });
+    }
+  }
+
+  if (legacyFormat && process.env.NODE_ENV === "development") {
+    console.warn(
+      `[reports/generate] Legacy string[] for ${fieldName}; mapped to { risk_id, text }`,
+    );
+  }
+
+  return result;
+}
 
 type SkillStatus = "strong" | "ok" | "risk" | "no_data";
 
@@ -295,7 +409,10 @@ function parseManagerRiskActions(value: unknown): ManagerRiskActionsMap {
       const risk = typeof row.risk === "string" ? row.risk.trim() : "";
       const actions = asStringArray(row.actions).slice(0, 3);
       if (!risk || actions.length === 0) continue;
-      parsed.push({ risk, actions });
+      const risk_id = row.risk_id
+        ? normalizeRiskId(row.risk_id)
+        : inferRiskIdFromText(risk);
+      parsed.push({ risk_id, risk, actions });
     }
     if (parsed.length > 0) {
       result[managerName.trim()] = parsed;
@@ -317,7 +434,7 @@ function parseReportJson(raw: string): ReportJson {
         ? parsed.summary.trim()
         : "Краткий вывод не предоставлен.",
     strengths: asStringArray(parsed.strengths).slice(0, 6),
-    weaknesses: asStringArray(parsed.weaknesses).slice(0, 6),
+    weaknesses: parseRiskItems(parsed.weaknesses, "weaknesses").slice(0, 6),
     coaching_focus: asStringArray(parsed.coaching_focus).slice(0, 6),
     skill_breakdown: Array.isArray(parsed.skill_breakdown)
       ? parsed.skill_breakdown
@@ -342,7 +459,10 @@ function parseReportJson(raw: string): ReportJson {
           })
           .slice(0, 8)
       : [],
-    repeated_patterns: asStringArray(parsed.repeated_patterns).slice(0, 8),
+    repeated_patterns: parseRiskItems(parsed.repeated_patterns, "repeated_patterns").slice(
+      0,
+      8,
+    ),
     manager_notes: asStringArray(parsed.manager_notes).slice(0, 8),
     manager_risk_actions: parseManagerRiskActions(parsed.manager_risk_actions),
   };
@@ -419,19 +539,22 @@ export const REPORT_SYSTEM_PROMPT = `Ты — Алекс Рэмси, дирек�
 4. Для каждого менеджера: одна главная точка роста — не список из 10 пунктов,
    а ОДНО самое важное, что изменит его результат.
 
+СЛОВАРЬ risk_id (используй ТОЛЬКО эти ключи; если риск не подходит — other):
+${formatRiskIdCatalogForPrompt()}
+
 Ответ — строго валидный JSON (без markdown) по схеме:
 {
   "average_score": number | null,
   "period_score": number | null,
   "summary": string,
-  "repeated_patterns": string[],
+  "repeated_patterns": [{ "risk_id": string, "text": string }],
   "manager_notes": string[],
   "coaching_focus": string[],
   "strengths": string[],
-  "weaknesses": string[],
+  "weaknesses": [{ "risk_id": string, "text": string }],
   "manager_risk_actions": {
     "[имя менеджера]": [
-      { "risk": string, "actions": string[] }
+      { "risk_id": string, "risk": string, "actions": string[] }
     ]
   },
   "skill_breakdown": [
@@ -446,9 +569,8 @@ summary — «Общая картина»:
   есть ли лидер, есть ли балласт. 2–3 предложения. Конкретные имена.
 
 repeated_patterns — «Системные провалы периода»:
-  Ровно 3 пункта. Каждый: название паттерна + кто грешит + пример из звонков.
-  Формат строки: «🔴 [Название]: [Кто][Пример из звонка с датой][Почему это дорого стоит]»
-  Пример: «Менеджер X на звонке от [дата]...»
+  Ровно 3 объекта { risk_id, text }. risk_id — ОБЯЗАТЕЛЬНО из словаря выше.
+  text — русский текст: «🔴 [Название]: [Кто][Пример из звонка с датой][Почему это дорого стоит]».
 
 manager_notes — «Разбор по менеджерам»:
   На КАЖДОГО менеджера из team_by_manager — ОДИН абзац, структура:
@@ -462,17 +584,20 @@ coaching_focus — «План действий на следующую неде�
   «Провести...», «Разобрать...», «Поставить KPI...», «Слушать совместно...»
   Первые 2 — самое срочное (горит). Последние 2 — системное (на перспективу).
 
-strengths — сильные стороны фокус-менеджера (focus_manager): 3–5 конкретных пунктов.
-weaknesses — слабые стороны фокус-менеджера: 3–5 конкретных пунктов.
+strengths — сильные стороны фокус-менеджера (focus_manager): 3–5 конкретных пунктов (string[]).
+
+weaknesses — слабые стороны фокус-менеджера: 3–5 объектов { risk_id, text }.
+  risk_id — ОБЯЗАТЕЛЬНО из словаря. text — конкретная формулировка на русском.
 
 manager_risk_actions — «Что делать» по рискам:
-  Для КАЖДОГО менеджера из team_by_manager: ТОП-3 риска и к каждому 2–3 конкретных действия.
-  Действия: короткие, глагол в начале, максимум 10 слов каждое.
-  Поле risk должно совпадать по смыслу с пунктами weaknesses (фокус-менеджер) и repeated_patterns (команда).
+  Для КАЖДОГО менеджера из team_by_manager: ТОП-3 риска, объекты { risk_id, risk, actions }.
+  risk_id ДОЛЖЕН совпадать с risk_id в weaknesses / repeated_patterns для того же риска.
+  actions: 2–3 пункта, глагол в начале, максимум 10 слов каждое.
   Пример:
   {
     "Иван": [
       {
+        "risk_id": "price_objection_handling",
         "risk": "Не отрабатывает возражения по цене",
         "actions": [
           "Разобрать 3 звонка где клиент спросил про цену",
@@ -521,6 +646,9 @@ export function buildReportUserMessage(input: {
   }));
 
   return `Сформируй коучинговый отчёт по данным ниже.
+
+Допустимые risk_id (только из этого списка; иначе other):
+${formatRiskIdCatalogForPrompt()}
 
 Контекст:
 - Компания: ${input.companyName}
@@ -797,21 +925,42 @@ export async function POST(request: NextRequest) {
         );
       }
 
-      const weaknesses: string[] = [];
+      const weaknesses: ReportRiskItem[] = [];
       for (const item of normalizedWeaknesses.slice(0, 5)) {
-        weaknesses.push(item);
+        weaknesses.push(toRiskItem(item));
       }
       for (const skill of weakSkills) {
         if (weaknesses.length >= 5) break;
-        weaknesses.push(`${skill.label}: проявлено слабо, снижает конверсию.`);
+        weaknesses.push(
+          toRiskItem(
+            `${skill.label}: проявлено слабо, снижает конверсию.`,
+            skill.key === "price" || skill.key === "objections"
+              ? "price_objection_handling"
+              : skill.key === "upsell"
+                ? "upsell_missed"
+                : skill.key === "competition"
+                  ? "competitor_positioning_weak"
+                  : skill.key === "qualification"
+                    ? "discovery_shallow"
+                    : skill.key === "closing"
+                      ? "next_steps_unclear"
+                      : "other",
+          ),
+        );
       }
       if (!weaknesses.length) {
         weaknesses.push(
-          sampleIsSmall
-            ? "По ограниченному числу звонков критичных повторяющихся ошибок пока не видно."
-            : "Явных повторяющихся коммерческих провалов немного, но нужно усилить стабильность ключевых этапов звонка."
+          toRiskItem(
+            sampleIsSmall
+              ? "По ограниченному числу звонков критичных повторяющихся ошибок пока не видно."
+              : "Явных повторяющихся коммерческих провалов немного, но нужно усилить стабильность ключевых этапов звонка.",
+          ),
         );
       }
+
+      const repeated_patterns: ReportRiskItem[] = repeatedPatterns.map((text) =>
+        toRiskItem(text),
+      );
 
       const coaching_focus: string[] = [];
       const focusCandidates = [...weakSkills, ...midSkills].slice(0, 3);
@@ -859,7 +1008,7 @@ export async function POST(request: NextRequest) {
         weaknesses: weaknesses.slice(0, 5),
         coaching_focus,
         skill_breakdown: baseSkillBreakdown,
-        repeated_patterns: repeatedPatterns,
+        repeated_patterns: repeated_patterns.slice(0, 3),
         manager_notes,
         manager_risk_actions: {},
       };

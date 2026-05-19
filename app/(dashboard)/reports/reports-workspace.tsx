@@ -5,12 +5,23 @@ import type { ReportManager } from "./page";
 
 type RangePreset = "week" | "month" | "custom";
 
+type ReportRiskItem = {
+  risk_id: string;
+  text: string;
+};
+
+type ManagerRiskAction = {
+  risk_id: string;
+  risk: string;
+  actions: string[];
+};
+
 type ReportPayload = {
   average_score: number | null;
   period_score: number | null;
   summary: string;
   strengths: string[];
-  weaknesses: string[];
+  weaknesses: ReportRiskItem[];
   coaching_focus: string[];
   skill_breakdown: {
     key: string;
@@ -19,12 +30,9 @@ type ReportPayload = {
     value: number | null;
     comment: string;
   }[];
-  repeated_patterns: string[];
+  repeated_patterns: ReportRiskItem[];
   manager_notes: string[];
-  manager_risk_actions?: Record<
-    string,
-    { risk: string; actions: string[] }[]
-  >;
+  manager_risk_actions?: Record<string, ManagerRiskAction[]>;
   managerName: string;
   callsCount: number;
   analyzedCallsCount: number;
@@ -450,8 +458,6 @@ export function ReportsWorkspace({ managers }: { managers: ReportManager[] }) {
   );
 }
 
-type ManagerRiskAction = { risk: string; actions: string[] };
-
 function getManagerRiskEntries(
   map: Record<string, ManagerRiskAction[]> | undefined,
   managerName: string,
@@ -464,34 +470,30 @@ function getManagerRiskEntries(
   return key ? (map[key] ?? []) : [];
 }
 
-function findActionsForRiskItem(
-  item: string,
-  risks: ManagerRiskAction[],
-  used: Set<number>,
-): ManagerRiskAction | null {
-  const norm = item
-    .toLowerCase()
-    .replace(/🔴\s*/g, "")
-    .trim();
-  for (let i = 0; i < risks.length; i++) {
-    if (used.has(i)) continue;
-    const riskNorm = risks[i].risk.toLowerCase();
-    if (
-      norm.includes(riskNorm) ||
-      riskNorm.includes(norm.slice(0, 40)) ||
-      norm.split(/[.:,]/)[0]?.includes(riskNorm.slice(0, 20))
-    ) {
-      used.add(i);
-      return risks[i];
-    }
+function buildActionsByRiskId(
+  entries: ManagerRiskAction[],
+): Map<string, string[]> {
+  const map = new Map<string, string[]>();
+  for (const entry of entries) {
+    if (!entry.risk_id || entry.actions.length === 0) continue;
+    map.set(entry.risk_id, entry.actions);
   }
-  for (let i = 0; i < risks.length; i++) {
-    if (!used.has(i)) {
-      used.add(i);
-      return risks[i];
+  return map;
+}
+
+function normalizeRiskItems(
+  items: ReportRiskItem[] | string[] | undefined,
+): ReportRiskItem[] {
+  if (!items?.length) return [];
+  return items.map((item, idx) => {
+    if (typeof item === "string") {
+      return { risk_id: "other", text: item };
     }
-  }
-  return null;
+    return {
+      risk_id: item.risk_id?.trim() || "other",
+      text: item.text?.trim() || `Риск ${idx + 1}`,
+    };
+  });
 }
 
 function RiskListWithActions({
@@ -501,18 +503,19 @@ function RiskListWithActions({
   riskActions,
 }: {
   title: string;
-  items: string[];
+  items: ReportRiskItem[] | string[];
   managerName: string;
   riskActions?: Record<string, ManagerRiskAction[]>;
 }) {
-  const managerRisks = getManagerRiskEntries(riskActions, managerName);
+  const riskItems = normalizeRiskItems(items);
+  const actionsByRiskId = buildActionsByRiskId(
+    getManagerRiskEntries(riskActions, managerName),
+  );
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
-  if (!items.length) {
-    return <ReportListBlock title={title} items={items} />;
+  if (!riskItems.length) {
+    return <ReportListBlock title={title} items={[]} />;
   }
-
-  const used = new Set<number>();
 
   return (
     <section className="report-section rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 print:border-zinc-300 print:bg-white">
@@ -520,12 +523,9 @@ function RiskListWithActions({
         {title}
       </h3>
       <ul className="mt-2 space-y-3 text-sm text-zinc-200 print:text-zinc-900">
-        {items.map((item, idx) => {
-          const matched = managerRisks.length
-            ? findActionsForRiskItem(item, managerRisks, used)
-            : null;
-          const actions = matched?.actions ?? [];
-          const key = `${title}-${idx}`;
+        {riskItems.map((item, idx) => {
+          const actions = actionsByRiskId.get(item.risk_id) ?? [];
+          const key = `${title}-${item.risk_id}-${idx}`;
           const isOpen = expanded[key] ?? false;
           const showActions = actions.length > 0;
 
@@ -534,7 +534,7 @@ function RiskListWithActions({
               <div className="flex gap-2">
                 <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400 print:bg-black" />
                 <div className="min-w-0 flex-1">
-                  <p>{item}</p>
+                  <p>{item.text}</p>
                   {showActions ? (
                     <div className="mt-2">
                       <button
