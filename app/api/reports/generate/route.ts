@@ -119,6 +119,54 @@ function asStringArray(value: unknown): string[] {
   return value.map(String).map((v) => v.trim()).filter(Boolean);
 }
 
+const NEUTRAL_COACHING_FOCUS_FALLBACK = [
+  "Сформируйте план коучинга по результатам периода",
+];
+
+const LEGACY_COACHING_FOCUS_PATTERN =
+  /разобрать\s+2-3\s+звонка\s+на\s+встрече\s+1:1\s+и\s+зафиксировать/i;
+
+function extractStringArrayField(
+  parsed: Record<string, unknown>,
+  keys: string[],
+): string[] {
+  for (const key of keys) {
+    const arr = asStringArray(parsed[key]);
+    if (arr.length) return arr;
+  }
+  const nested = parsed.report;
+  if (nested && typeof nested === "object" && !Array.isArray(nested)) {
+    return extractStringArrayField(nested as Record<string, unknown>, keys);
+  }
+  return [];
+}
+
+function isLegacyTemplateCoachingFocus(items: string[]): boolean {
+  if (!items.length) return false;
+  return items.every((item) => LEGACY_COACHING_FOCUS_PATTERN.test(item));
+}
+
+function resolveCoachingFocus(llmItems: string[]): string[] {
+  const cleaned = llmItems.map((v) => v.trim()).filter(Boolean);
+  if (!cleaned.length) return NEUTRAL_COACHING_FOCUS_FALLBACK;
+  if (isLegacyTemplateCoachingFocus(cleaned)) {
+    console.warn(
+      "[reports/generate] coaching_focus looks like legacy template; using neutral fallback",
+    );
+    return NEUTRAL_COACHING_FOCUS_FALLBACK;
+  }
+  return cleaned.slice(0, 6);
+}
+
+function sanitizeManagerNotes(notes: string[]): string[] {
+  return notes.map((note) => {
+    if (/company_profile/i.test(note)) {
+      return "Данные по продукту заполнены частично, выводы делаем осторожно.";
+    }
+    return note;
+  });
+}
+
 function asFiniteNumber(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) return value;
   const parsed = Number(value);
@@ -367,7 +415,14 @@ function parseReportJson(raw: string): ReportJson {
         : "Краткий вывод не предоставлен.",
     strengths: asStringArray(parsed.strengths).slice(0, 6),
     weaknesses: parseRiskItems(parsed.weaknesses, "weaknesses").slice(0, 6),
-    coaching_focus: asStringArray(parsed.coaching_focus).slice(0, 6),
+    coaching_focus: resolveCoachingFocus(
+      extractStringArrayField(parsed, [
+        "coaching_focus",
+        "coachingFocus",
+        "coaching_plan",
+        "action_plan",
+      ]),
+    ),
     skill_breakdown: Array.isArray(parsed.skill_breakdown)
       ? parsed.skill_breakdown
           .map((item) => item as Record<string, unknown>)
@@ -395,7 +450,13 @@ function parseReportJson(raw: string): ReportJson {
       0,
       8,
     ),
-    manager_notes: asStringArray(parsed.manager_notes).slice(0, 8),
+    manager_notes: sanitizeManagerNotes(
+      extractStringArrayField(parsed, [
+        "manager_notes",
+        "managerNotes",
+        "manager_notes_text",
+      ]),
+    ).slice(0, 8),
     manager_risk_actions: parseManagerRiskActions(parsed.manager_risk_actions),
   };
 }
@@ -824,7 +885,6 @@ export async function POST(request: NextRequest) {
       const normalizedWeaknesses = buildTheses(allNegatives, "weakness", 5);
       const repeatedStrengths = normalizedStrengths.map((item) => stripRawSpeech(item));
       const weakSkills = baseSkillBreakdown.filter((skill) => skill.status === "risk");
-      const midSkills = baseSkillBreakdown.filter((skill) => skill.status === "ok");
       const strongSkills = baseSkillBreakdown.filter((skill) => skill.status === "strong");
       const sampleIsSmall = analyzedCallsCount <= 2;
 
@@ -912,19 +972,7 @@ export async function POST(request: NextRequest) {
         toRiskItem(text),
       );
 
-      const coaching_focus: string[] = [];
-      const focusCandidates = [...weakSkills, ...midSkills].slice(0, 3);
-      for (const skill of focusCandidates) {
-        coaching_focus.push(
-          `${skill.label}: разобрать 2-3 звонка на встрече 1:1 и зафиксировать конкретный скрипт/чеклист применения на следующую неделю.`
-        );
-      }
-      if (!coaching_focus.length) {
-        coaching_focus.push(
-          "Сфокусироваться на структуре звонка: цель клиента -> квалификация -> предложение -> следующий шаг."
-        );
-      }
-      coaching_focus.splice(3);
+      const coaching_focus = [...NEUTRAL_COACHING_FOCUS_FALLBACK];
 
       const manager_notes: string[] = [];
       manager_notes.push(
@@ -938,7 +986,7 @@ export async function POST(request: NextRequest) {
           : "Отчет собран по звонкам с анализом, данные подходят для регулярной управленческой встречи."
       );
       manager_notes.push(
-        "Если company_profile заполнен частично или пусто, выводы по УТП, допродажам и продуктовой подаче считаем осторожными, без финальных выводов."
+        "Данные по продукту заполнены частично, выводы делаем осторожно."
       );
       if (weakSkills.length > 0) {
         manager_notes.push(
@@ -1060,9 +1108,7 @@ export async function POST(request: NextRequest) {
       summary: report.summary || fallbackReport.summary,
       strengths: report.strengths.length ? report.strengths : fallbackReport.strengths,
       weaknesses: report.weaknesses.length ? report.weaknesses : fallbackReport.weaknesses,
-      coaching_focus: report.coaching_focus.length
-        ? report.coaching_focus
-        : fallbackReport.coaching_focus,
+      coaching_focus: resolveCoachingFocus(report.coaching_focus),
       skill_breakdown: report.skill_breakdown.length
         ? report.skill_breakdown
         : baseSkillBreakdown,
@@ -1070,7 +1116,7 @@ export async function POST(request: NextRequest) {
         ? report.repeated_patterns
         : fallbackReport.repeated_patterns,
       manager_notes: report.manager_notes.length
-        ? report.manager_notes
+        ? sanitizeManagerNotes(report.manager_notes)
         : fallbackReport.manager_notes,
       manager_risk_actions: report.manager_risk_actions,
     };
