@@ -58,7 +58,7 @@ export async function AppShell({
 
   return (
     <div className="flex h-screen min-h-screen w-full overflow-hidden bg-zinc-950 text-zinc-100">
-      <aside className="flex h-full min-h-0 w-56 shrink-0 flex-col overflow-hidden border-r border-zinc-800 bg-zinc-900/40">
+      <aside className="app-shell-sidebar no-print flex h-full min-h-0 w-56 shrink-0 flex-col overflow-hidden border-r border-zinc-800 bg-zinc-900/40">
         <div className="shrink-0 border-b border-zinc-800 px-4 py-5">
           <Link
             href="/dashboard"

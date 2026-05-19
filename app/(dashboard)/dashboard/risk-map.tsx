@@ -60,7 +60,7 @@ export function RiskMap() {
   }, [load]);
 
   return (
-    <section className="mt-10">
+    <section className="no-print mt-10">
       <h2 className="text-lg font-semibold text-zinc-100">
         Карта рисков команды · последние 30 дней
       </h2>

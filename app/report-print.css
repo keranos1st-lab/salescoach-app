@@ -1,0 +1,206 @@
+/* Управленческий отчёт — печать / «Сохранить как PDF» в браузере */
+
+@media print {
+  @page {
+    size: A4;
+    margin: 20mm;
+  }
+
+  * {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  html,
+  body {
+    background: #ffffff !important;
+    color: #111827 !important;
+    font-size: 11pt !important;
+    line-height: 1.5 !important;
+  }
+
+  .no-print,
+  .report-form,
+  .report-screen-meta,
+  .app-shell-sidebar {
+    display: none !important;
+  }
+
+  body.printing > div {
+    display: block !important;
+    height: auto !important;
+    min-height: 0 !important;
+    overflow: visible !important;
+    background: #ffffff !important;
+  }
+
+  body.printing main {
+    display: block !important;
+    overflow: visible !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: none !important;
+  }
+
+  .report-workspace-screen {
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  .report-output {
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  #print-report {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .report-article {
+    border: none !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    background: #ffffff !important;
+    color: #111827 !important;
+  }
+
+  .report-pdf-cover {
+    display: block !important;
+    margin-bottom: 1.25rem;
+    padding-bottom: 1rem;
+    border-bottom: 2px solid #0d9488;
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
+  .report-pdf-cover__brand {
+    font-size: 14pt;
+    font-weight: 700;
+    color: #0d9488 !important;
+  }
+
+  .report-pdf-cover__title {
+    margin-top: 0.35rem;
+    font-size: 16pt;
+    font-weight: 700;
+    color: #111827 !important;
+  }
+
+  .report-pdf-cover__meta {
+    margin-top: 0.75rem;
+    font-size: 11pt;
+    color: #374151 !important;
+  }
+
+  .report-pdf-cover__meta p {
+    margin: 0.2rem 0;
+  }
+
+  .report-section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    margin-bottom: 1rem !important;
+    padding: 0.75rem !important;
+    border: 1px solid #d4d4d8 !important;
+    background: #f9fafb !important;
+    border-radius: 6px !important;
+  }
+
+  .report-section-title {
+    font-size: 13pt !important;
+    font-weight: 700 !important;
+    color: #111827 !important;
+    text-transform: none !important;
+    letter-spacing: normal !important;
+  }
+
+  .report-print-page-break {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  .report-skill-card {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    background: #ffffff !important;
+    border: 1px solid #e5e7eb !important;
+  }
+
+  .report-list-row,
+  .report-risk-item {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .report-risk-toggle {
+    display: none !important;
+  }
+
+  .report-risk-actions-label {
+    display: block !important;
+    margin-top: 0.5rem;
+    font-size: 10pt;
+    font-weight: 600;
+    color: #0d9488 !important;
+  }
+
+  .report-risk-actions-list {
+    display: block !important;
+    margin-top: 0.35rem !important;
+    padding-left: 1rem !important;
+    border-left: 3px solid #0d9488 !important;
+    list-style: disc !important;
+  }
+
+  .report-risk-actions-list li {
+    display: list-item !important;
+    margin: 0.25rem 0;
+    color: #1f2937 !important;
+    font-size: 10.5pt;
+  }
+
+  .report-skill-badge--strong {
+    background-color: #d1fae5 !important;
+    color: #065f46 !important;
+    border-color: #6ee7b7 !important;
+  }
+
+  .report-skill-badge--ok {
+    background-color: #fef3c7 !important;
+    color: #92400e !important;
+    border-color: #fcd34d !important;
+  }
+
+  .report-skill-badge--risk {
+    background-color: #fee2e2 !important;
+    color: #991b1b !important;
+    border-color: #fca5a5 !important;
+  }
+
+  .report-skill-badge--no_data {
+    background-color: #f3f4f6 !important;
+    color: #4b5563 !important;
+    border-color: #d1d5db !important;
+  }
+
+  table {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  thead {
+    display: table-header-group;
+  }
+
+  tr,
+  .report-list-row {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+}

@@ -60,7 +60,6 @@ export function ReportsWorkspace({ managers }: { managers: ReportManager[] }) {
   const [customFrom, setCustomFrom] = useState("");
   const [customTo, setCustomTo] = useState("");
   const [loading, setLoading] = useState(false);
-  const [pdfLoading, setPdfLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [report, setReport] = useState<ReportPayload | null>(null);
   const [generatedAt, setGeneratedAt] = useState<string>("");
@@ -154,125 +153,17 @@ export function ReportsWorkspace({ managers }: { managers: ReportManager[] }) {
     }, 1000);
   }
 
-  async function handleDownloadPdf() {
-    if (pdfLoading) return;
-    if (!reportRef.current) {
-      setError("Не удалось найти отчёт для PDF. Сначала сгенерируйте отчёт ещё раз.");
-      return;
-    }
-    setError(null);
-    setPdfLoading(true);
-    try {
-      // Ждём рендер и финальный layout длинного отчёта перед экспортом.
-      await new Promise<void>((resolve) =>
-        requestAnimationFrame(() =>
-          requestAnimationFrame(() => {
-            resolve();
-          })
-        )
-      );
-
-      const { jsPDF } = await import("jspdf");
-      const { default: html2canvas } = await import("html2canvas-pro");
-      const selectedManagerName =
-        report?.managerName ||
-        managers.find((m) => m.id === managerId)?.name ||
-        "Менеджер";
-      const managerName = selectedManagerName
-        .replace(/\s+/g, "_")
-        .replace(/[^a-zA-Zа-яА-ЯёЁ0-9_]/g, "");
-      const today = new Date();
-      const date = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, "0")}-${String(
-        today.getDate()
-      ).padStart(2, "0")}`;
-
-      const doc = new jsPDF({
-        orientation: "p",
-        unit: "pt",
-        format: "a4",
-      });
-      const pageWidth = doc.internal.pageSize.getWidth();
-      const pageHeight = doc.internal.pageSize.getHeight();
-      const marginX = 24;
-      const marginY = 28;
-      const contentWidth = pageWidth - marginX * 2;
-      const contentHeight = pageHeight - marginY * 2;
-
-      const fullCanvas = await html2canvas(reportRef.current, {
-        scale: 1.25,
-        useCORS: true,
-        backgroundColor: "#ffffff",
-        windowWidth: reportRef.current.scrollWidth,
-      });
-
-      const pxPerPt = fullCanvas.width / contentWidth;
-      const pageSliceHeightPx = Math.max(1, Math.floor(contentHeight * pxPerPt));
-      let offsetY = 0;
-      let pageIndex = 0;
-
-      while (offsetY < fullCanvas.height) {
-        const remaining = fullCanvas.height - offsetY;
-        const sliceHeightPx = Math.min(pageSliceHeightPx, remaining);
-        const pageCanvas = document.createElement("canvas");
-        pageCanvas.width = fullCanvas.width;
-        pageCanvas.height = sliceHeightPx;
-        const pageCtx = pageCanvas.getContext("2d");
-        if (!pageCtx) {
-          throw new Error("Не удалось подготовить страницу PDF.");
-        }
-
-        pageCtx.fillStyle = "#ffffff";
-        pageCtx.fillRect(0, 0, pageCanvas.width, pageCanvas.height);
-        pageCtx.drawImage(
-          fullCanvas,
-          0,
-          offsetY,
-          fullCanvas.width,
-          sliceHeightPx,
-          0,
-          0,
-          fullCanvas.width,
-          sliceHeightPx
-        );
-
-        const sliceHeightPt = sliceHeightPx / pxPerPt;
-        if (pageIndex > 0) {
-          doc.addPage();
-        }
-        doc.addImage(
-          pageCanvas.toDataURL("image/png"),
-          "PNG",
-          marginX,
-          marginY,
-          contentWidth,
-          sliceHeightPt
-        );
-
-        offsetY += sliceHeightPx;
-        pageIndex += 1;
-      }
-
-      doc.save(`Отчёт_${managerName}_${date}.pdf`);
-    } catch (downloadError) {
-      console.error("[reports/pdf] export error", downloadError);
-      setError(
-        "Не удалось сформировать PDF. Попробуйте снова или используйте кнопку «Печать отчёта» как временный вариант."
-      );
-    } finally {
-      setPdfLoading(false);
-    }
-  }
 
   return (
-    <div className="mx-auto w-full max-w-5xl space-y-8">
-      <header>
+    <div className="report-workspace-screen mx-auto w-full max-w-5xl space-y-8">
+      <header className="no-print">
         <h1 className="text-2xl font-semibold tracking-tight">Отчеты по менеджерам</h1>
         <p className="mt-1 text-sm text-zinc-500">
           Выберите менеджера и период, чтобы получить управленческий отчёт
         </p>
       </header>
 
-      <section className="report-form rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
+      <section className="report-form no-print rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6">
         <div className="grid gap-4 md:grid-cols-2">
           <div className="space-y-2">
             <label htmlFor="report-manager" className="text-sm font-medium text-zinc-300">
@@ -374,25 +265,6 @@ export function ReportsWorkspace({ managers }: { managers: ReportManager[] }) {
           >
             {loading ? "Генерация..." : "Сгенерировать отчёт"}
           </button>
-          {report ? (
-            <>
-              <button
-                type="button"
-                onClick={handleDownloadPdf}
-                disabled={pdfLoading}
-                className="report-download-btn rounded-xl border border-zinc-700 px-4 py-3 text-sm font-semibold text-zinc-200 transition hover:bg-zinc-800"
-              >
-                {pdfLoading ? "Подготовка PDF..." : "Скачать PDF"}
-              </button>
-              <button
-                type="button"
-                onClick={handlePrint}
-                className="rounded-xl border border-zinc-700 px-4 py-3 text-sm font-semibold text-zinc-200 transition hover:bg-zinc-800"
-              >
-                Печать отчёта
-              </button>
-            </>
-          ) : null}
         </div>
 
         {error ? (
@@ -407,15 +279,50 @@ export function ReportsWorkspace({ managers }: { managers: ReportManager[] }) {
 
       {report ? (
         <section className="report-output space-y-4 print:space-y-3">
+          <div className="no-print flex justify-end">
+            <button
+              type="button"
+              onClick={handlePrint}
+              className="inline-flex items-center gap-2 rounded-xl border border-zinc-700 bg-zinc-900/60 px-4 py-2.5 text-sm font-semibold text-zinc-200 transition hover:bg-zinc-800"
+            >
+              <svg
+                xmlns="http://www.w3.org/2000/svg"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                className="h-4 w-4 shrink-0"
+                aria-hidden
+              >
+                <path d="M6 9V2h12v7" />
+                <path d="M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" />
+                <path d="M6 14h12v8H6z" />
+              </svg>
+              Скачать PDF
+            </button>
+          </div>
+
           <div id="print-report" ref={reportRef}>
             <article className="report-article space-y-5 rounded-2xl border border-zinc-800 bg-zinc-900/50 p-6 print:space-y-4 print:border-zinc-700 print:bg-white print:text-black">
-              <div className="report-print-header hidden">
-                <p className="text-lg font-semibold">SalesCoach AI</p>
-                <p className="text-sm">Дата генерации: {generatedAt || "—"}</p>
-              </div>
-              <h2 className="text-xl font-semibold">Управленческий отчёт по менеджеру</h2>
+              <header className="report-pdf-cover hidden print:block">
+                <p className="report-pdf-cover__brand">SalesCoach</p>
+                <p className="report-pdf-cover__title">Управленческий отчёт</p>
+                <div className="report-pdf-cover__meta">
+                  <p>Менеджер: {report.managerName}</p>
+                  <p>
+                    Период: {report.from} — {report.to}
+                  </p>
+                  <p>Сформирован: {generatedAt || "—"}</p>
+                </div>
+              </header>
 
-              <section className="report-section rounded-xl border border-zinc-800 bg-zinc-950/60 p-4 print:border-zinc-300 print:bg-zinc-100">
+              <h2 className="text-xl font-semibold print:hidden">
+                Управленческий отчёт по менеджеру
+              </h2>
+
+              <section className="report-section report-screen-meta rounded-xl border border-zinc-800 bg-zinc-950/60 p-4 print:border-zinc-300 print:bg-zinc-100">
                 <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400 print:text-zinc-700">
                   Шапка отчёта
                 </h3>
@@ -431,7 +338,7 @@ export function ReportsWorkspace({ managers }: { managers: ReportManager[] }) {
               </section>
 
               <section className="report-section rounded-xl border border-zinc-800 bg-zinc-950/60 p-4 print:border-zinc-300 print:bg-zinc-100">
-                <h3 className="text-xs font-semibold uppercase tracking-wide text-zinc-400 print:text-zinc-700">
+                <h3 className="report-section-title text-xs font-semibold uppercase tracking-wide text-zinc-400 print:text-zinc-700">
                   Главный summary
                 </h3>
                 <div className="mt-3 grid gap-3 sm:grid-cols-2 print:grid-cols-2">
@@ -450,7 +357,11 @@ export function ReportsWorkspace({ managers }: { managers: ReportManager[] }) {
                 managerName={report.managerName}
                 riskActions={report.manager_risk_actions}
               />
-              <ReportListBlock title="Фокус коучинга" items={report.coaching_focus} />
+              <ReportListBlock
+                title="Фокус коучинга"
+                items={report.coaching_focus}
+                pageBreakBefore={report.coaching_focus.length >= 4}
+              />
               <SkillBreakdownBlock items={report.skill_breakdown} />
               <RiskListWithActions
                 title="Повторяющиеся паттерны"
@@ -458,7 +369,11 @@ export function ReportsWorkspace({ managers }: { managers: ReportManager[] }) {
                 managerName={report.managerName}
                 riskActions={report.manager_risk_actions}
               />
-              <ReportListBlock title="Заметки для руководителя" items={report.manager_notes} />
+              <ReportListBlock
+                title="Заметки для руководителя"
+                items={report.manager_notes}
+                pageBreakBefore={report.manager_notes.length >= 4}
+              />
             </article>
           </div>
         </section>
@@ -532,7 +447,7 @@ function RiskListWithActions({
 
   return (
     <section className="report-section rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 print:border-zinc-300 print:bg-white">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-[#5eead4] print:text-black">
+      <h3 className="report-section-title text-sm font-semibold uppercase tracking-wide text-[#5eead4] print:text-black">
         {title}
       </h3>
       <ul className="mt-2 space-y-3 text-sm text-zinc-200 print:text-zinc-900">
@@ -543,7 +458,10 @@ function RiskListWithActions({
           const showActions = actions.length > 0;
 
           return (
-            <li key={key} className="rounded-lg border border-zinc-800/80 bg-zinc-900/30 p-3 print:border-zinc-300 print:bg-zinc-50">
+            <li
+              key={key}
+              className="report-risk-item rounded-lg border border-zinc-800/80 bg-zinc-900/30 p-3 print:border-zinc-300 print:bg-zinc-50"
+            >
               <div className="flex gap-2">
                 <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-rose-400 print:bg-black" />
                 <div className="min-w-0 flex-1">
@@ -558,7 +476,7 @@ function RiskListWithActions({
                             [key]: !prev[key],
                           }))
                         }
-                        className="inline-flex items-center gap-1 text-xs font-medium text-[#5eead4] transition hover:text-[#2dd4bf] print:hidden"
+                        className="report-risk-toggle inline-flex items-center gap-1 text-xs font-medium text-[#5eead4] transition hover:text-[#2dd4bf]"
                         aria-expanded={isOpen}
                       >
                         <span
@@ -568,13 +486,14 @@ function RiskListWithActions({
                         </span>
                         Что делать
                       </button>
+                      <p className="report-risk-actions-label hidden">Что делать</p>
                       <ul
-                        className={`mt-2 space-y-1.5 border-l border-[#0d9488]/40 pl-3 text-xs text-zinc-300 print:text-zinc-800 ${
-                          isOpen ? "block" : "hidden print:block"
+                        className={`report-risk-actions-list mt-2 space-y-1.5 border-l border-[#0d9488]/40 pl-3 text-xs text-zinc-300 print:text-zinc-800 ${
+                          isOpen ? "block" : "hidden"
                         }`}
                       >
                         {actions.map((action, actionIdx) => (
-                          <li key={actionIdx} className="leading-relaxed">
+                          <li key={actionIdx} className="report-list-row leading-relaxed">
                             {action}
                           </li>
                         ))}
@@ -591,16 +510,28 @@ function RiskListWithActions({
   );
 }
 
-function ReportListBlock({ title, items }: { title: string; items: string[] }) {
+function ReportListBlock({
+  title,
+  items,
+  pageBreakBefore = false,
+}: {
+  title: string;
+  items: string[];
+  pageBreakBefore?: boolean;
+}) {
   return (
-    <section className="report-section rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 print:border-zinc-300 print:bg-white">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-[#5eead4] print:text-black">
+    <section
+      className={`report-section rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 print:border-zinc-300 print:bg-white ${
+        pageBreakBefore ? "report-print-page-break" : ""
+      }`}
+    >
+      <h3 className="report-section-title text-sm font-semibold uppercase tracking-wide text-[#5eead4] print:text-black">
         {title}
       </h3>
       <ul className="mt-2 space-y-2 text-sm text-zinc-200 print:text-zinc-900">
         {items.length ? (
           items.map((item, idx) => (
-            <li key={`${item}-${idx}`} className="flex gap-2">
+            <li key={`${item}-${idx}`} className="report-list-row flex gap-2">
               <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-[#5eead4] print:bg-black" />
               <span>{item}</span>
             </li>
@@ -650,7 +581,7 @@ function SkillBreakdownBlock({
 }) {
   return (
     <section className="report-section rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 print:border-zinc-300 print:bg-white">
-      <h3 className="text-sm font-semibold uppercase tracking-wide text-[#5eead4] print:text-black">
+      <h3 className="report-section-title text-sm font-semibold uppercase tracking-wide text-[#5eead4] print:text-black">
         Навыковый разбор
       </h3>
       <div className="mt-3 space-y-2.5">
@@ -658,7 +589,7 @@ function SkillBreakdownBlock({
           items.map((item) => (
             <div
               key={item.key}
-              className="rounded-lg border border-zinc-800 bg-zinc-900/30 p-3 print:border-zinc-300 print:bg-white"
+              className="report-skill-card rounded-lg border border-zinc-800 bg-zinc-900/30 p-3 print:border-zinc-300 print:bg-white"
             >
               <div className="flex flex-wrap items-center justify-between gap-2">
                 <p className="text-sm font-medium text-zinc-100 print:text-zinc-900">
@@ -691,12 +622,12 @@ function SkillStatusBadge({
 }) {
   const styles =
     status === "strong"
-      ? "border-emerald-600/60 bg-emerald-500/10 text-emerald-300 print:border-zinc-500 print:bg-white print:text-black"
+      ? "report-skill-badge--strong border-emerald-600/60 bg-emerald-500/10 text-emerald-300"
       : status === "ok"
-        ? "border-amber-600/60 bg-amber-500/10 text-amber-300 print:border-zinc-500 print:bg-white print:text-black"
+        ? "report-skill-badge--ok border-amber-600/60 bg-amber-500/10 text-amber-300"
         : status === "risk"
-          ? "border-rose-600/60 bg-rose-500/10 text-rose-300 print:border-zinc-500 print:bg-white print:text-black"
-          : "border-zinc-600 bg-zinc-800 text-zinc-300 print:border-zinc-500 print:bg-white print:text-black";
+          ? "report-skill-badge--risk border-rose-600/60 bg-rose-500/10 text-rose-300"
+          : "report-skill-badge--no_data border-zinc-600 bg-zinc-800 text-zinc-300";
 
   const label =
     status === "strong"

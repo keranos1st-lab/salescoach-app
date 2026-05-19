@@ -33,30 +33,8 @@ export default async function ReportsPage() {
 
   return (
     <AppShell activeHref="/reports">
-      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-8">
+      <main className="flex min-h-0 min-w-0 flex-1 flex-col overflow-y-auto p-8 print:p-0">
         <ReportsWorkspace managers={managerOptions} />
-        <style>{`
-          @media print {
-            @page {
-              size: A4;
-              margin: 14mm;
-            }
-
-            /* Скрываем всё кроме отчёта */
-            body * { visibility: hidden; }
-            
-            /* Показываем только блок отчёта */
-            #print-report, #print-report * { visibility: visible; }
-            
-            #print-report {
-              position: static;
-              display: block;
-              width: auto;
-              margin: 0;
-              padding: 0;
-            }
-          }
-        `}</style>
       </main>
     </AppShell>
   );
