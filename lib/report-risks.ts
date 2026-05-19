@@ -13,6 +13,35 @@ export const RISK_LABELS: Record<string, string> = {
 
 export const REPORT_RISK_IDS = Object.keys(RISK_LABELS);
 
+/** Цвета линий на графике тренда рисков (дашборд). */
+export const RISK_CHART_COLORS: Record<string, string> = {
+  price_objection_handling: "#ef4444",
+  upsell_missed: "#f97316",
+  competitor_positioning_weak: "#eab308",
+  discovery_shallow: "#f59e0b",
+  next_steps_unclear: "#dc2626",
+  script_structure_weak: "#a855f7",
+  rapport_weak: "#8b5cf6",
+  talk_ratio_high: "#6366f1",
+  followup_missing: "#ec4899",
+  other: "#71717a",
+};
+
+const RISK_CHART_FALLBACK_PALETTE = [
+  "#ef4444",
+  "#f59e0b",
+  "#14b8a6",
+  "#8b5cf6",
+  "#ec4899",
+  "#22c55e",
+  "#3b82f6",
+  "#f97316",
+];
+
+export function riskChartColor(riskId: string, index: number): string {
+  return RISK_CHART_COLORS[normalizeRiskId(riskId)] ?? RISK_CHART_FALLBACK_PALETTE[index % RISK_CHART_FALLBACK_PALETTE.length];
+}
+
 export type ReportRiskItem = {
   risk_id: string;
   text: string;
@@ -169,6 +198,37 @@ export function enrichManagerRiskActions(
     ...incoming,
     [focusManagerName.trim()]: Array.from(byId.values()).slice(0, 6),
   };
+}
+
+/** Уникальные risk_id звонка (negatives + эвристика next_task + analysisJson.risks). */
+export function extractCallRiskIds(
+  negatives: unknown,
+  nextTask?: string | null,
+  analysisJson?: unknown,
+): string[] {
+  const ids = new Set<string>();
+  for (const item of parseRiskItems(negatives)) {
+    ids.add(item.risk_id);
+  }
+  const next = nextTask?.trim();
+  if (next && /нет следующего|не зафиксир|размыт/i.test(next)) {
+    ids.add("next_steps_unclear");
+  }
+  if (analysisJson && typeof analysisJson === "object" && !Array.isArray(analysisJson)) {
+    const row = analysisJson as Record<string, unknown>;
+    const raw = row.risks ?? row.risk_ids;
+    if (Array.isArray(raw)) {
+      for (const entry of raw) {
+        if (typeof entry === "string") {
+          ids.add(normalizeRiskId(entry));
+        } else if (typeof entry === "object" && entry !== null) {
+          const r = entry as Record<string, unknown>;
+          if (r.risk_id != null) ids.add(normalizeRiskId(r.risk_id));
+        }
+      }
+    }
+  }
+  return Array.from(ids);
 }
 
 export function parseRiskItems(

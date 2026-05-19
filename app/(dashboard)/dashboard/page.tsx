@@ -1,8 +1,11 @@
 import { AppShell } from "@/components/app-shell";
+import { RiskTrendChart } from "@/components/dashboard/risk-trend-chart";
 import { RiskMap } from "./risk-map";
 import { ScoreTrendChart } from "./score-trend-chart";
 import { getAuthContext } from "@/lib/get-auth-context";
+import { getPlanFeatures } from "@/lib/plan-features";
 import { prisma } from "@/lib/prisma";
+import type { Plan } from "@prisma/client";
 import Link from "next/link";
 import { redirect } from "next/navigation";
 
@@ -26,6 +29,9 @@ export default async function DashboardPage() {
   if (!companyId) {
     redirect("/login");
   }
+
+  const plan = ctx.subscription?.plan ?? ("TRIAL" as Plan);
+  const features = getPlanFeatures(plan);
 
   // depends on authContext: prisma uses companyId from ctx; single query — no Promise.all with getAuthContext.
   const callsRaw = await prisma.call.findMany({
@@ -121,7 +127,22 @@ export default async function DashboardPage() {
           </div>
         </section>
 
-        <RiskMap />
+        {features.riskMap ? <RiskMap /> : (
+          <section className="locked-feature no-print mt-10 rounded-2xl border border-dashed border-zinc-700 bg-zinc-900/40 p-6 sm:p-8">
+            <h2 className="text-lg font-semibold text-zinc-200">Карта рисков команды</h2>
+            <p className="mt-2 text-sm text-zinc-400">
+              Карта рисков команды доступна на тарифе Стандарт и выше
+            </p>
+            <Link
+              href="/profile?open=plans"
+              className="mt-4 inline-flex text-sm font-semibold text-[#5eead4] transition hover:text-[#2dd4bf]"
+            >
+              Улучшить тариф →
+            </Link>
+          </section>
+        )}
+
+        {features.riskTrend ? <RiskTrendChart /> : null}
 
         <section className="mt-10">
           <h2 className="text-lg font-semibold text-zinc-100">Динамика среднего балла</h2>
