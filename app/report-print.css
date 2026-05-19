@@ -127,6 +127,11 @@
     border-radius: 6px !important;
   }
 
+  .report-article > .report-section:last-child {
+    margin-bottom: 0 !important;
+    padding-bottom: 0 !important;
+  }
+
   .report-summary-section {
     break-after: avoid;
     page-break-after: avoid;
