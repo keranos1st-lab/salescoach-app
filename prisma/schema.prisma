@@ -112,15 +112,19 @@ enum SubStatus {
 }
 
 model Call {
-  id         String   @id @default(cuid())
-  companyId  String
-  managerId  String?
-  audioUrl   String?
-  transcript String?
-  score      Int?
-  createdAt  DateTime @default(now())
-  company    Company  @relation(fields: [companyId], references: [id])
-  manager    Manager? @relation(fields: [managerId], references: [id])
+  id           String   @id @default(cuid())
+  companyId    String
+  managerId    String?
+  audioUrl     String?
+  transcript   String?
+  score        Int?
+  positives    Json?
+  negatives    Json?
+  nextTask     String?  @db.Text
+  analysisJson Json?
+  createdAt    DateTime @default(now())
+  company      Company  @relation(fields: [companyId], references: [id])
+  manager      Manager? @relation(fields: [managerId], references: [id])
 }
 
 model Account {

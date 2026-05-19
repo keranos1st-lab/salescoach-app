@@ -44,6 +44,22 @@ function asStringArray(value: unknown): string[] {
   return value.map(String).filter(Boolean);
 }
 
+function hasStoredAnalysis(c: CallListItem): boolean {
+  return (
+    asStringArray(c.positives).length > 0 ||
+    asStringArray(c.negatives).length > 0 ||
+    Boolean(c.next_task?.trim())
+  );
+}
+
+function AnalysisNotSavedBadge() {
+  return (
+    <span className="inline-flex rounded-full border border-zinc-600 bg-zinc-800/80 px-2.5 py-0.5 text-xs font-medium text-zinc-400">
+      Анализ не сохранён
+    </span>
+  );
+}
+
 function scoreStyles(score: number) {
   if (score >= 80) {
     return {
@@ -559,7 +575,15 @@ export function CallsWorkspace({
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-[#5eead4]">
                       Задача на следующий звонок
                     </p>
-                    <p className="mt-1 text-sm text-zinc-200">{c.next_task || "—"}</p>
+                    {hasStoredAnalysis(c) ? (
+                      <p className="mt-1 text-sm text-zinc-200">
+                        {c.next_task?.trim() || "—"}
+                      </p>
+                    ) : (
+                      <div className="mt-2">
+                        <AnalysisNotSavedBadge />
+                      </div>
+                    )}
                   </div>
 
                   {expandedCallId === c.id ? (
@@ -576,8 +600,12 @@ export function CallsWorkspace({
                                 <span>{item}</span>
                               </li>
                             ))
+                          ) : hasStoredAnalysis(c) ? (
+                            <li className="text-zinc-500">—</li>
                           ) : (
-                            <li className="text-zinc-500">Нет данных</li>
+                            <li>
+                              <AnalysisNotSavedBadge />
+                            </li>
                           )}
                         </ul>
                       </div>
@@ -593,8 +621,12 @@ export function CallsWorkspace({
                                 <span>{item}</span>
                               </li>
                             ))
+                          ) : hasStoredAnalysis(c) ? (
+                            <li className="text-zinc-500">—</li>
                           ) : (
-                            <li className="text-zinc-500">Нет данных</li>
+                            <li>
+                              <AnalysisNotSavedBadge />
+                            </li>
                           )}
                         </ul>
                       </div>

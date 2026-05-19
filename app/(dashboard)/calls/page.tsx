@@ -55,9 +55,9 @@ export default async function CallsPage() {
     created_at: row.createdAt.toISOString(),
     score: row.score,
     transcript: row.transcript,
-    positives: null,
-    negatives: null,
-    next_task: null,
+    positives: row.positives,
+    negatives: row.negatives,
+    next_task: row.nextTask,
     audio_url: row.audioUrl,
     managers: row.manager ? { name: row.manager.name } : null,
   }));

@@ -465,6 +465,10 @@ export async function POST(request: NextRequest) {
           audioUrl: finalPath,
           transcript: transcriptText,
           score: analysis.score,
+          positives: analysis.positives,
+          negatives: analysis.negatives,
+          nextTask: analysis.next_task,
+          analysisJson: worm,
         },
       });
     } catch (insertErr) {
@@ -479,9 +483,9 @@ export async function POST(request: NextRequest) {
       call: {
         id: callRow.id,
         score: callRow.score,
-        positives: analysis.positives,
-        negatives: analysis.negatives,
-        next_task: analysis.next_task,
+        positives: callRow.positives ?? analysis.positives,
+        negatives: callRow.negatives ?? analysis.negatives,
+        next_task: callRow.nextTask ?? analysis.next_task,
         transcript: callRow.transcript,
         created_at: callRow.createdAt.toISOString(),
         audio_url: callRow.audioUrl,
