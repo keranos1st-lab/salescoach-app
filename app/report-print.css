@@ -3,7 +3,7 @@
 @media print {
   @page {
     size: A4;
-    margin: 20mm;
+    margin: 20mm 25mm 20mm 25mm;
   }
 
   * {
@@ -72,12 +72,14 @@
   .report-article {
     border: none !important;
     box-shadow: none !important;
+    margin: 0 !important;
     padding: 0 !important;
     background: #ffffff !important;
     color: #111827 !important;
     display: flex !important;
     flex-direction: column !important;
     gap: 12px !important;
+    box-sizing: border-box !important;
   }
 
   .report-article > * {
@@ -87,11 +89,13 @@
 
   .report-pdf-cover {
     display: block !important;
+    margin: 0 !important;
     margin-bottom: 0 !important;
-    padding-bottom: 0.75rem !important;
+    padding: 0 0 0.75rem 0 !important;
     border-bottom: 2px solid #0d9488;
     break-after: avoid;
     page-break-after: avoid;
+    box-sizing: border-box !important;
   }
 
   .report-pdf-cover__brand {
