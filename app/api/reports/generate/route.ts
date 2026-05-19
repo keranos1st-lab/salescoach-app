@@ -3,6 +3,14 @@ import {
   isProductAccessDenied,
 } from "@/lib/assert-product-access";
 import { getAuthContext } from "@/lib/get-auth-context";
+import {
+  enrichManagerRiskActions,
+  parseManagerRiskActions,
+  parseRiskItems,
+  type ManagerRiskAction,
+  type ManagerRiskActionsMap,
+  type ReportRiskItem,
+} from "@/lib/report-risks";
 import { prisma } from "@/lib/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import OpenAI from "openai";
@@ -44,18 +52,7 @@ export const REPORT_RISK_ID_CATALOG = [
 
 export type ReportRiskId = (typeof REPORT_RISK_ID_CATALOG)[number]["id"];
 
-export type ReportRiskItem = {
-  risk_id: string;
-  text: string;
-};
-
-export type ManagerRiskAction = {
-  risk_id: string;
-  risk: string;
-  actions: string[];
-};
-
-export type ManagerRiskActionsMap = Record<string, ManagerRiskAction[]>;
+export type { ManagerRiskAction, ManagerRiskActionsMap, ReportRiskItem };
 
 type ReportJson = {
   average_score: number | null;
@@ -105,44 +102,6 @@ function toRiskItem(text: string, riskId?: string): ReportRiskItem {
     risk_id: riskId ? normalizeRiskId(riskId) : inferRiskIdFromText(trimmed),
     text: trimmed,
   };
-}
-
-function parseRiskItems(value: unknown, fieldName: string): ReportRiskItem[] {
-  if (!Array.isArray(value)) return [];
-
-  const result: ReportRiskItem[] = [];
-  let legacyFormat = false;
-
-  for (const item of value.slice(0, 8)) {
-    if (typeof item === "string") {
-      legacyFormat = true;
-      const text = item.trim();
-      if (text) result.push(toRiskItem(text));
-      continue;
-    }
-    if (typeof item === "object" && item !== null) {
-      const row = item as Record<string, unknown>;
-      const text =
-        typeof row.text === "string"
-          ? row.text.trim()
-          : typeof row.risk === "string"
-            ? row.risk.trim()
-            : "";
-      if (!text) continue;
-      result.push({
-        risk_id: normalizeRiskId(row.risk_id),
-        text,
-      });
-    }
-  }
-
-  if (legacyFormat && process.env.NODE_ENV === "development") {
-    console.warn(
-      `[reports/generate] Legacy string[] for ${fieldName}; mapped to { risk_id, text }`,
-    );
-  }
-
-  return result;
 }
 
 type SkillStatus = "strong" | "ok" | "risk" | "no_data";
@@ -392,33 +351,6 @@ function topRepeated(items: string[], limit: number): string[] {
     .sort((a, b) => b[1] - a[1])
     .slice(0, limit)
     .map(([key, count]) => (count > 1 ? `${key} — ${count} раза` : key));
-}
-
-function parseManagerRiskActions(value: unknown): ManagerRiskActionsMap {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) {
-    return {};
-  }
-
-  const result: ManagerRiskActionsMap = {};
-  for (const [managerName, entries] of Object.entries(value)) {
-    if (!Array.isArray(entries)) continue;
-    const parsed: ManagerRiskAction[] = [];
-    for (const entry of entries.slice(0, 3)) {
-      if (typeof entry !== "object" || entry === null) continue;
-      const row = entry as Record<string, unknown>;
-      const risk = typeof row.risk === "string" ? row.risk.trim() : "";
-      const actions = asStringArray(row.actions).slice(0, 3);
-      if (!risk || actions.length === 0) continue;
-      const risk_id = row.risk_id
-        ? normalizeRiskId(row.risk_id)
-        : inferRiskIdFromText(risk);
-      parsed.push({ risk_id, risk, actions });
-    }
-    if (parsed.length > 0) {
-      result[managerName.trim()] = parsed;
-    }
-  }
-  return result;
 }
 
 function parseReportJson(raw: string): ReportJson {
@@ -1016,9 +948,16 @@ export async function POST(request: NextRequest) {
 
     if (calls.length === 0) {
       const report = makeFallbackReport();
+      const manager_risk_actions = enrichManagerRiskActions(
+        manager.name,
+        report.weaknesses,
+        report.repeated_patterns,
+        report.manager_risk_actions,
+      );
       return NextResponse.json({
         report: {
           ...report,
+          manager_risk_actions,
           managerName: manager.name,
           callsCount: 0,
           analyzedCallsCount,
@@ -1065,8 +1004,22 @@ export async function POST(request: NextRequest) {
         if (!rawJson) {
           console.warn("[reports/generate] Empty provider response, using fallback report");
         } else {
+          if (process.env.NODE_ENV === "development") {
+            console.log("[reports/generate] rawReport:", rawJson);
+          }
           try {
             report = parseReportJson(rawJson);
+            if (process.env.NODE_ENV === "development") {
+              console.log("[reports/generate] parsed weaknesses:", report.weaknesses);
+              console.log(
+                "[reports/generate] parsed repeated_patterns:",
+                report.repeated_patterns,
+              );
+              console.log(
+                "[reports/generate] parsed manager_risk_actions:",
+                report.manager_risk_actions,
+              );
+            }
           } catch {
             console.warn("[reports/generate] Failed to parse provider JSON, using fallback report");
           }
@@ -1101,15 +1054,24 @@ export async function POST(request: NextRequest) {
       manager_notes: report.manager_notes.length
         ? report.manager_notes
         : fallbackReport.manager_notes,
-      manager_risk_actions:
-        Object.keys(report.manager_risk_actions).length > 0
-          ? report.manager_risk_actions
-          : fallbackReport.manager_risk_actions,
+      manager_risk_actions: report.manager_risk_actions,
     };
+
+    const manager_risk_actions = enrichManagerRiskActions(
+      manager.name,
+      normalizedReport.weaknesses,
+      normalizedReport.repeated_patterns,
+      normalizedReport.manager_risk_actions,
+    );
+
+    if (process.env.NODE_ENV === "development") {
+      console.log("[reports/generate] enriched manager_risk_actions:", manager_risk_actions);
+    }
 
     return NextResponse.json({
       report: {
         ...normalizedReport,
+        manager_risk_actions,
         managerName: manager.name,
         callsCount: calls.length,
         analyzedCallsCount,

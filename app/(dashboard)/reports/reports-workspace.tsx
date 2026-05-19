@@ -1,5 +1,6 @@
 "use client";
 
+import { inferRiskIdFromText } from "@/lib/report-risks";
 import { useMemo, useRef, useState } from "react";
 import type { ReportManager } from "./page";
 
@@ -106,6 +107,14 @@ export function ReportsWorkspace({ managers }: { managers: ReportManager[] }) {
         return;
       }
       setReport(json.report);
+      if (process.env.NODE_ENV === "development") {
+        console.log("[reports-workspace] report payload:", {
+          weaknesses: json.report.weaknesses,
+          repeated_patterns: json.report.repeated_patterns,
+          manager_risk_actions: json.report.manager_risk_actions,
+          managerName: json.report.managerName,
+        });
+      }
       setGeneratedAt(new Date().toLocaleString("ru-RU"));
     } catch {
       setError("Ошибка сети");
@@ -471,12 +480,16 @@ function getManagerRiskEntries(
 }
 
 function buildActionsByRiskId(
-  entries: ManagerRiskAction[],
+  ...lists: ManagerRiskAction[][]
 ): Map<string, string[]> {
   const map = new Map<string, string[]>();
-  for (const entry of entries) {
-    if (!entry.risk_id || entry.actions.length === 0) continue;
-    map.set(entry.risk_id, entry.actions);
+  for (const entries of lists) {
+    for (const entry of entries) {
+      if (!entry.risk_id || entry.actions.length === 0) continue;
+      if (!map.has(entry.risk_id)) {
+        map.set(entry.risk_id, entry.actions);
+      }
+    }
   }
   return map;
 }
@@ -487,7 +500,7 @@ function normalizeRiskItems(
   if (!items?.length) return [];
   return items.map((item, idx) => {
     if (typeof item === "string") {
-      return { risk_id: "other", text: item };
+      return { risk_id: inferRiskIdFromText(item), text: item };
     }
     return {
       risk_id: item.risk_id?.trim() || "other",
@@ -508,9 +521,9 @@ function RiskListWithActions({
   riskActions?: Record<string, ManagerRiskAction[]>;
 }) {
   const riskItems = normalizeRiskItems(items);
-  const actionsByRiskId = buildActionsByRiskId(
-    getManagerRiskEntries(riskActions, managerName),
-  );
+  const focusEntries = getManagerRiskEntries(riskActions, managerName);
+  const allEntries = Object.values(riskActions ?? {}).flat();
+  const actionsByRiskId = buildActionsByRiskId(focusEntries, allEntries);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   if (!riskItems.length) {
