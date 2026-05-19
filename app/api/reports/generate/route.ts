@@ -319,6 +319,181 @@ function normalizeDate(value: string, endOfDay: boolean) {
   return `${value}${endOfDay ? "T23:59:59.999Z" : "T00:00:00.000Z"}`;
 }
 
+/** ~150 слов/мин речи; длительность оценочная по транскрипту. */
+function estimateDurationSecFromTranscript(transcript: string | null): number | null {
+  const text = transcript?.trim();
+  if (!text) return null;
+  const words = text.split(/\s+/).filter(Boolean).length;
+  if (words < 3) return null;
+  return Math.round((words / 150) * 60);
+}
+
+type ReportCallInput = {
+  id: string;
+  date: string;
+  score: number | null;
+  duration_sec: number | null;
+  positives: string[];
+  negatives: string[];
+  next_task: string | null;
+  manager_id: string | null;
+  manager_name: string;
+};
+
+function mapCallRowToInput(
+  row: {
+    id: string;
+    score: number | null;
+    transcript: string | null;
+    positives: unknown;
+    negatives: unknown;
+    nextTask: string | null;
+    createdAt: Date;
+    managerId: string | null;
+    manager: { id: string; name: string } | null;
+  },
+  fallbackManagerName: string,
+): ReportCallInput {
+  return {
+    id: row.id,
+    date: row.createdAt.toISOString().slice(0, 10),
+    score: row.score,
+    duration_sec: estimateDurationSecFromTranscript(row.transcript),
+    positives: asStringArray(row.positives),
+    negatives: asStringArray(row.negatives),
+    next_task: row.nextTask?.trim() || null,
+    manager_id: row.managerId,
+    manager_name: row.manager?.name ?? fallbackManagerName,
+  };
+}
+
+export const REPORT_SYSTEM_PROMPT = `Ты — Алекс Рэмси, директор по продажам с 20-летним опытом в B2B.
+Ты лично вытащил 30+ отделов продаж из стагнации. Говоришь жёстко, по делу, без политесов.
+Твои отчёты читают как приговор — и немедленно идут исправлять.
+
+ФИЛОСОФИЯ АНАЛИЗА:
+- Средний балл — ложь. Важно: растёт ли менеджер от звонка к звонку?
+- Одна системная ошибка убивает конверсию сильнее, чем десять случайных.
+- Если менеджер делает одно и то же неправильно 3+ раза — это не ошибка, это привычка.
+  Привычки лечатся только drill-тренингом, не беседой.
+- Лучший звонок команды — эталон. Остальные измеряются от него.
+
+КАК АНАЛИЗИРОВАТЬ (порядок работы):
+1. Сначала найди ЛУЧШИЙ звонок периода — опиши, что там было правильно.
+2. Найди ХУДШИЙ паттерн — что повторяется у одного или нескольких менеджеров.
+3. Определи: у кого ДИНАМИКА РОСТА (последние звонки лучше первых)?
+   У кого ДЕГРАДАЦИЯ? У кого ПЛАТО (стабильно средне — это тоже проблема)?
+4. Для каждого менеджера: одна главная точка роста — не список из 10 пунктов,
+   а ОДНО самое важное, что изменит его результат.
+
+Ответ — строго валидный JSON (без markdown) по схеме:
+{
+  "average_score": number | null,
+  "period_score": number | null,
+  "summary": string,
+  "repeated_patterns": string[],
+  "manager_notes": string[],
+  "coaching_focus": string[],
+  "strengths": string[],
+  "weaknesses": string[],
+  "skill_breakdown": [
+    { "key": string, "label": string, "status": "strong|ok|risk|no_data", "value": number | null, "comment": string }
+  ]
+}
+
+СТРУКТУРА ПОЛЕЙ:
+
+summary — «Общая картина»:
+  Не «команда работает нормально». Скажи правду: растёт команда или деградирует,
+  есть ли лидер, есть ли балласт. 2–3 предложения. Конкретные имена.
+
+repeated_patterns — «Системные провалы периода»:
+  Ровно 3 пункта. Каждый: название паттерна + кто грешит + пример из звонков.
+  Формат строки: «🔴 [Название]: [Кто][Пример из звонка с датой][Почему это дорого стоит]»
+  Пример: «Менеджер X на звонке от [дата]...»
+
+manager_notes — «Разбор по менеджерам»:
+  На КАЖДОГО менеджера из team_by_manager — ОДИН абзац, структура:
+  «[Имя]: [Динамика: растёт/деградирует/плато]. Сильная сторона — [конкретно].
+   Главная точка роста — [конкретно, с примером из звонков].
+   Вердикт: [одно слово или короткая фраза — например: «Готов к росту»,
+   «Нужен индивидуальный коучинг», «Риск потери клиентов»]»
+
+coaching_focus — «План действий на следующую неделю»:
+  Ровно 5 пунктов. Не абстрактных. Каждый начинается с глагола действия:
+  «Провести...», «Разобрать...», «Поставить KPI...», «Слушать совместно...»
+  Первые 2 — самое срочное (горит). Последние 2 — системное (на перспективу).
+
+strengths — сильные стороны фокус-менеджера (focus_manager): 3–5 конкретных пунктов.
+weaknesses — слабые стороны фокус-менеджера: 3–5 конкретных пунктов.
+
+skill_breakdown — возьми переданный baseline и скорректируй comment по фактам из звонков.
+
+ПРАВИЛА:
+- Никакой воды, никакого «в целом неплохо».
+- Если данных мало (< 3 звонков) — честно предупреди, но всё равно дай максимум из того, что есть.
+- Выдуманные факты запрещены — только то, что есть в данных звонков (score, positives, negatives, next_task, date).
+- Звонки без positives/negatives не используй для выводов о навыках; если их много — скажи прямо.
+- Язык: русский, живой, профессиональный — не канцелярит, не чат-бот.`;
+
+export function buildReportUserMessage(input: {
+  companyName: string;
+  periodFrom: string;
+  periodTo: string;
+  focusManagerId: string;
+  focusManagerName: string;
+  computedAvg: number | null;
+  calls: ReportCallInput[];
+  teamByManager: {
+    manager_id: string;
+    manager_name: string;
+    calls_count: number;
+    analyzed_count: number;
+    avg_score: number | null;
+    calls: ReportCallInput[];
+  }[];
+  analyzedCallsCount: number;
+  skillBreakdown: SkillBreakdownItem[];
+}): string {
+  const focusCalls = input.calls;
+  const teamSummary = input.teamByManager.map((m) => ({
+    manager_id: m.manager_id,
+    manager_name: m.manager_name,
+    calls_count: m.calls_count,
+    analyzed_count: m.analyzed_count,
+    avg_score: m.avg_score,
+  }));
+
+  return `Сформируй коучинговый отчёт по данным ниже.
+
+Контекст:
+- Компания: ${input.companyName}
+- Период: ${input.periodFrom} — ${input.periodTo}
+- Фокус-менеджер отчёта: ${input.focusManagerName} (id: ${input.focusManagerId})
+- Средний балл фокус-менеджера (расчёт системы): ${input.computedAvg ?? "нет данных"}
+- Звонков у фокус-менеджера: ${focusCalls.length}, с анализом: ${input.analyzedCallsCount}
+
+Сводка по команде за период (для сравнения менеджеров):
+${JSON.stringify(teamSummary, null, 2)}
+
+Звонки фокус-менеджера (excluded=false; поля: score, positives[], negatives[], next_task, duration_sec — оценка по транскрипту):
+${JSON.stringify(focusCalls, null, 2)}
+
+Все звонки команды по менеджерам (для паттернов и сравнения; те же поля):
+${JSON.stringify(
+  input.teamByManager.map((m) => ({
+    manager_id: m.manager_id,
+    manager_name: m.manager_name,
+    calls: m.calls,
+  })),
+  null,
+  2,
+)}
+
+Базовый skill_breakdown (скопируй в ответ и уточни comment по фактам):
+${JSON.stringify(input.skillBreakdown, null, 2)}`;
+}
+
 function providerErrorDetails(error: unknown): {
   status: number | null;
   code: string | null;
@@ -397,10 +572,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Некорректный диапазон дат" }, { status: 400 });
     }
 
-    const manager = await prisma.manager.findFirst({
-      where: { id: managerId, companyId, isActive: true },
-      select: { id: true, name: true },
-    });
+    const [manager, company] = await Promise.all([
+      prisma.manager.findFirst({
+        where: { id: managerId, companyId, isActive: true },
+        select: { id: true, name: true },
+      }),
+      prisma.company.findUnique({
+        where: { id: companyId },
+        select: { name: true },
+      }),
+    ]);
 
     if (!manager) {
       return NextResponse.json(
@@ -409,26 +590,45 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const companyName = company?.name?.trim() || "Компания";
     const fromDate = new Date(normalizeDate(from, false));
     const toDate = new Date(normalizeDate(to, true));
 
-    const callsRaw = await prisma.call.findMany({
-      where: {
-        companyId,
-        managerId,
-        excluded: false,
-        createdAt: { gte: fromDate, lte: toDate },
-      },
-      orderBy: { createdAt: "asc" },
-      select: { score: true, transcript: true, createdAt: true },
-    });
+    const callSelect = {
+      id: true,
+      score: true,
+      transcript: true,
+      positives: true,
+      negatives: true,
+      nextTask: true,
+      createdAt: true,
+      managerId: true,
+      manager: { select: { id: true, name: true } },
+    } as const;
 
-    const calls = callsRaw.map((c) => ({
-      score: c.score,
-      positives: [] as string[],
-      negatives: [] as string[],
-      created_at: c.createdAt.toISOString(),
-    }));
+    const [callsRaw, teamCallsRaw] = await Promise.all([
+      prisma.call.findMany({
+        where: {
+          companyId,
+          managerId,
+          excluded: false,
+          createdAt: { gte: fromDate, lte: toDate },
+        },
+        orderBy: { createdAt: "asc" },
+        select: callSelect,
+      }),
+      prisma.call.findMany({
+        where: {
+          companyId,
+          excluded: false,
+          createdAt: { gte: fromDate, lte: toDate },
+        },
+        orderBy: { createdAt: "asc" },
+        select: callSelect,
+      }),
+    ]);
+
+    const calls = callsRaw.map((c) => mapCallRowToInput(c, manager.name));
 
     const scores = calls
       .map((c) => c.score)
@@ -443,9 +643,45 @@ export async function POST(request: NextRequest) {
     const analyzedCallsCount = calls.filter(
       (c) =>
         (typeof c.score === "number" && Number.isFinite(c.score)) ||
-        asStringArray(c.positives).length > 0 ||
-        asStringArray(c.negatives).length > 0
+        c.positives.length > 0 ||
+        c.negatives.length > 0,
     ).length;
+
+    const teamByManagerMap = new Map<
+      string,
+      { manager_id: string; manager_name: string; calls: ReportCallInput[] }
+    >();
+    for (const row of teamCallsRaw) {
+      const mid = row.managerId ?? row.manager?.id ?? "unknown";
+      const mname = row.manager?.name ?? "Без менеджера";
+      const bucket = teamByManagerMap.get(mid) ?? {
+        manager_id: mid,
+        manager_name: mname,
+        calls: [],
+      };
+      bucket.calls.push(mapCallRowToInput(row, mname));
+      teamByManagerMap.set(mid, bucket);
+    }
+    const teamByManager = Array.from(teamByManagerMap.values()).map((m) => {
+      const scores = m.calls
+        .map((c) => c.score)
+        .filter((s): s is number => typeof s === "number" && Number.isFinite(s));
+      const analyzed = m.calls.filter(
+        (c) =>
+          (typeof c.score === "number" && Number.isFinite(c.score)) ||
+          c.positives.length > 0 ||
+          c.negatives.length > 0,
+      ).length;
+      return {
+        ...m,
+        calls_count: m.calls.length,
+        analyzed_count: analyzed,
+        avg_score:
+          scores.length > 0
+            ? Number((scores.reduce((a, b) => a + b, 0) / scores.length).toFixed(1))
+            : null,
+      };
+    });
     const baseSkillBreakdown = computeSkillBreakdown(allPositives, allNegatives);
 
     const makeFallbackReport = (): ReportJson => {
@@ -586,48 +822,18 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    const prompt = `Ты руководитель отдела продаж. Подготовь управленческий executive report по менеджеру ${
-      manager.name
-    } за период ${from} - ${to}. Верни JSON строго по схеме:
-{
-  "average_score": number | null,
-  "period_score": number | null,
-  "summary": "короткий управленческий вывод",
-  "strengths": string[],
-  "weaknesses": string[],
-  "coaching_focus": string[],
-  "skill_breakdown": [
-    { "key": "usp|upsell|competition|qualification|price|objections|closing|product_context", "label": string, "status": "strong|ok|risk|no_data", "value": number | null, "comment": string }
-  ],
-  "repeated_patterns": string[],
-  "manager_notes": string[]
-}
-
-Правила:
-- Пиши только на русском.
-- Пиши простым русским языком, без канцелярита.
-- Дай управленческий тон и решения для 1:1, но честно по данным.
-- Учитывай, что часть звонков может быть без анализа.
-- Не придумывай факты про УТП, допродажи и отстройку от конкурентов, если сигналов мало.
-- При слабых сигналах используй осторожные формулировки: "по текущей выборке видно", "стоит обратить внимание", "пока не видно устойчивого использования", "в текущих звонках это проявлено слабо".
-- summary: 2-3 предложения (общий уровень, что лучше получается, где резерв роста).
-- strengths: максимум 3-5 пунктов, только повторяющиеся сильные сигналы.
-- weaknesses: упор на коммерческие упущения; если данных мало, формулируй мягко.
-- coaching_focus: 2-3 практичных задач для руководителя.
-- manager_notes: 2-4 коротких наблюдения для руководителя, без повтора strengths/weaknesses.
-- Если звонков мало, отмечай ограниченность выборки.
-- Если company_profile пустой или неполный, не делай категоричных выводов по продуктовой части.
-- Никакого markdown, только валидный JSON.
-
-Входные данные:
-- Количество звонков: ${calls.length}
-- Количество звонков с анализом: ${analyzedCallsCount}
-- Менеджер: ${manager.name}
-- Период: ${from} - ${to}
-- Подсчитанный средний балл: ${computedAvg ?? "нет данных"}
-- Сильные стороны из звонков: ${JSON.stringify(allPositives)}
-- Зоны роста из звонков: ${JSON.stringify(allNegatives)}
-- Базовый навыковый срез: ${JSON.stringify(baseSkillBreakdown)}`;
+    const userMessage = buildReportUserMessage({
+      companyName,
+      periodFrom: from,
+      periodTo: to,
+      focusManagerId: manager.id,
+      focusManagerName: manager.name,
+      computedAvg,
+      calls,
+      teamByManager,
+      analyzedCallsCount,
+      skillBreakdown: baseSkillBreakdown,
+    });
     const fallbackReport = makeFallbackReport();
     let report: ReportJson = fallbackReport;
 
@@ -644,12 +850,8 @@ export async function POST(request: NextRequest) {
           model: "meta-llama/llama-3.3-70b-instruct",
           response_format: { type: "json_object" },
           messages: [
-            {
-              role: "system",
-              content:
-                "Отвечай только валидным JSON-объектом на русском языке, без markdown.",
-            },
-            { role: "user", content: prompt },
+            { role: "system", content: REPORT_SYSTEM_PROMPT },
+            { role: "user", content: userMessage },
           ],
         });
 
