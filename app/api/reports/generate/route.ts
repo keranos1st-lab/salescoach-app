@@ -11,6 +11,13 @@ export const runtime = "nodejs";
 export const maxDuration = 120;
 export const preferredRegion = "iad1";
 
+export type ManagerRiskAction = {
+  risk: string;
+  actions: string[];
+};
+
+export type ManagerRiskActionsMap = Record<string, ManagerRiskAction[]>;
+
 type ReportJson = {
   average_score: number | null;
   period_score: number | null;
@@ -21,6 +28,7 @@ type ReportJson = {
   skill_breakdown: SkillBreakdownItem[];
   repeated_patterns: string[];
   manager_notes: string[];
+  manager_risk_actions: ManagerRiskActionsMap;
 };
 
 type SkillStatus = "strong" | "ok" | "risk" | "no_data";
@@ -272,6 +280,30 @@ function topRepeated(items: string[], limit: number): string[] {
     .map(([key, count]) => (count > 1 ? `${key} — ${count} раза` : key));
 }
 
+function parseManagerRiskActions(value: unknown): ManagerRiskActionsMap {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) {
+    return {};
+  }
+
+  const result: ManagerRiskActionsMap = {};
+  for (const [managerName, entries] of Object.entries(value)) {
+    if (!Array.isArray(entries)) continue;
+    const parsed: ManagerRiskAction[] = [];
+    for (const entry of entries.slice(0, 3)) {
+      if (typeof entry !== "object" || entry === null) continue;
+      const row = entry as Record<string, unknown>;
+      const risk = typeof row.risk === "string" ? row.risk.trim() : "";
+      const actions = asStringArray(row.actions).slice(0, 3);
+      if (!risk || actions.length === 0) continue;
+      parsed.push({ risk, actions });
+    }
+    if (parsed.length > 0) {
+      result[managerName.trim()] = parsed;
+    }
+  }
+  return result;
+}
+
 function parseReportJson(raw: string): ReportJson {
   const parsed = JSON.parse(raw) as Record<string, unknown>;
   const averageScore = asFiniteNumber(parsed.average_score ?? parsed.avgScore);
@@ -312,6 +344,7 @@ function parseReportJson(raw: string): ReportJson {
       : [],
     repeated_patterns: asStringArray(parsed.repeated_patterns).slice(0, 8),
     manager_notes: asStringArray(parsed.manager_notes).slice(0, 8),
+    manager_risk_actions: parseManagerRiskActions(parsed.manager_risk_actions),
   };
 }
 
@@ -396,6 +429,11 @@ export const REPORT_SYSTEM_PROMPT = `Ты — Алекс Рэмси, дирек�
   "coaching_focus": string[],
   "strengths": string[],
   "weaknesses": string[],
+  "manager_risk_actions": {
+    "[имя менеджера]": [
+      { "risk": string, "actions": string[] }
+    ]
+  },
   "skill_breakdown": [
     { "key": string, "label": string, "status": "strong|ok|risk|no_data", "value": number | null, "comment": string }
   ]
@@ -426,6 +464,24 @@ coaching_focus — «План действий на следующую неде�
 
 strengths — сильные стороны фокус-менеджера (focus_manager): 3–5 конкретных пунктов.
 weaknesses — слабые стороны фокус-менеджера: 3–5 конкретных пунктов.
+
+manager_risk_actions — «Что делать» по рискам:
+  Для КАЖДОГО менеджера из team_by_manager: ТОП-3 риска и к каждому 2–3 конкретных действия.
+  Действия: короткие, глагол в начале, максимум 10 слов каждое.
+  Поле risk должно совпадать по смыслу с пунктами weaknesses (фокус-менеджер) и repeated_patterns (команда).
+  Пример:
+  {
+    "Иван": [
+      {
+        "risk": "Не отрабатывает возражения по цене",
+        "actions": [
+          "Разобрать 3 звонка где клиент спросил про цену",
+          "Отработать технику «цена-ценность» на ролевой игре",
+          "Поставить KPI: называть цену первым в 80% звонков"
+        ]
+      }
+    ]
+  }
 
 skill_breakdown — возьми переданный baseline и скорректируй comment по фактам из звонков.
 
@@ -805,6 +861,7 @@ export async function POST(request: NextRequest) {
         skill_breakdown: baseSkillBreakdown,
         repeated_patterns: repeatedPatterns,
         manager_notes,
+        manager_risk_actions: {},
       };
     };
 
@@ -895,6 +952,10 @@ export async function POST(request: NextRequest) {
       manager_notes: report.manager_notes.length
         ? report.manager_notes
         : fallbackReport.manager_notes,
+      manager_risk_actions:
+        Object.keys(report.manager_risk_actions).length > 0
+          ? report.manager_risk_actions
+          : fallbackReport.manager_risk_actions,
     };
 
     return NextResponse.json({
