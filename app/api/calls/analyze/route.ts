@@ -9,12 +9,14 @@ import {
 } from "@/lib/assert-product-access";
 import { getMonthlyCallLimitStateForCompany } from "@/lib/call-limits";
 import { getAuthContextLite } from "@/lib/get-auth-context-lite";
+import {
+  analyzeCallTranscript,
+  OpenAICallAnalysisError,
+  requireOpenAIApiKey,
+  transcribeCallAudio,
+} from "@/lib/openai-call-analysis";
 import { prisma } from "@/lib/prisma";
 import { createSupabaseServiceClient } from "@/lib/supabase-service";
-import {
-  callWormsoftCallAnalysis,
-  WormsoftError,
-} from "@/lib/wormsoft-client";
 import type { CallAnalysisResponse } from "@/lib/wormsoft-types";
 import { randomUUID } from "crypto";
 import { NextRequest, NextResponse } from "next/server";
@@ -27,18 +29,18 @@ export type { CallAnalysisResponse } from "@/lib/wormsoft-types";
 const MAX_BYTES = 25 * 1024 * 1024;
 
 const CALL_ANALYSIS_JSON_SCHEMA = `{
-  "script_following": number,           // 0–10: следование скрипту/структуре разговора
-  "objection_handling": number,        // 0–10: работа с возражениями
-  "tone_and_rapport": number,          // 0–10: тон, контакт, эмпатия
-  "next_step_clarity": number,         // 0–10: ясность следующего шага
-  "upsell_attempts": number,           // 0–10: попытки допродажи / расширения сделки
-  "competitor_differentiation": number, // 0–10: отстройка от конкурентов, УТП
-  "summary": string,                   // общий вывод по звонку (кратко, по делу)
-  "mistakes": string[],                // ключевые ошибки менеджера
-  "good_points": string[]              // сильные стороны менеджера в этом звонке
+  "script_following": number,
+  "objection_handling": number,
+  "tone_and_rapport": number,
+  "next_step_clarity": number,
+  "upsell_attempts": number,
+  "competitor_differentiation": number,
+  "summary": string,
+  "mistakes": string[],
+  "good_points": string[]
 }`;
 
-const SYSTEM_CALL_ANALYSIS = `Ты — руководитель отдела продаж и тренер по продажам. Твоя задача — анализировать диалог менеджера с клиентом по транскрипту и выставлять оценки по нескольким критериям (0–10), а также формировать краткий текстовый разбор. Всегда отвечай строго валидным JSON по заданной схеме, без лишнего текста и без форматирования.`;
+const SYSTEM_CALL_ANALYSIS = `Ты — руководитель отдела продаж и тренер по продажам. Твоя задача — анализировать диалог менеджера с клиентом по транскрипту и выставлять оценки по нескольким критериям (0–10), а также формировать краткий текстовый разбор. Всегда отвечай строго валидным JSON-объектом по заданной схеме, без лишнего текста и без markdown.`;
 
 function sanitizeFilename(name: string): string {
   return name.replace(/[^a-zA-Z0-9._-]/g, "_").slice(0, 180) || "audio";
@@ -77,7 +79,7 @@ function profileContextBlock(profile: CompanyProfile | null): string {
 
 function mapCallAnalysisToExtended(
   raw: CallAnalysisResponse,
-  signals: ReturnType<typeof buildProductCallSignals>
+  signals: ReturnType<typeof buildProductCallSignals>,
 ): ExtendedAnalysis {
   const dims = [
     raw.script_following,
@@ -135,14 +137,11 @@ ${CALL_ANALYSIS_JSON_SCHEMA}
 Не выдумывай факты, которых нет в транскрипте, и обязательно придерживайся границ 0–10 для оценок.`;
 }
 
-async function assemblyAiResponseJson<T>(response: Response): Promise<T> {
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(
-      `AssemblyAI error: ${errorText.trim() || response.statusText}`
-    );
-  }
-  return (await response.json()) as T;
+function openAiKeyMissingResponse() {
+  return NextResponse.json(
+    { error: "Не задан OPENAI_API_KEY в окружении" },
+    { status: 500 },
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -154,24 +153,20 @@ export async function POST(request: NextRequest) {
     const userId = ctx.user.id;
     const companyId = ctx.user.companyId;
 
+    if (!requireOpenAIApiKey()) {
+      return openAiKeyMissingResponse();
+    }
+
     const contentType = request.headers.get("content-type") ?? "";
 
     if (contentType.includes("application/json")) {
-      const wormsoftKey = process.env.WORMSOFT_API_KEY?.trim();
-      if (!wormsoftKey) {
-        return NextResponse.json(
-          { error: "Не задан WORMSOFT_API_KEY в окружении" },
-          { status: 500 }
-        );
-      }
-
       const body = (await request.json()) as { transcript?: string };
       const transcript =
         typeof body.transcript === "string" ? body.transcript.trim() : "";
       if (!transcript) {
         return NextResponse.json(
           { error: "Передайте непустой transcript" },
-          { status: 400 }
+          { status: 400 },
         );
       }
 
@@ -187,41 +182,29 @@ export async function POST(request: NextRequest) {
         : null;
 
       try {
-        const result = await callWormsoftCallAnalysis({
+        const result = await analyzeCallTranscript({
           system: SYSTEM_CALL_ANALYSIS,
           user: buildCallUserPrompt(transcriptForModel, companyProfile),
         });
         return NextResponse.json(result);
       } catch (e) {
-        if (e instanceof WormsoftError) {
+        if (e instanceof OpenAICallAnalysisError) {
           return NextResponse.json({ error: e.message }, { status: 502 });
         }
         throw e;
       }
     }
 
-    const wormsoftKey = process.env.WORMSOFT_API_KEY?.trim();
-    if (!wormsoftKey) {
-      return NextResponse.json(
-        { error: "Не задан WORMSOFT_API_KEY в окружении" },
-        { status: 500 }
-      );
-    }
-
     console.log("[calls/analyze] supabase env (no secrets)", {
       hasNextPublicSupabaseUrl: Boolean(
-        process.env.NEXT_PUBLIC_SUPABASE_URL?.trim()
+        process.env.NEXT_PUBLIC_SUPABASE_URL?.trim(),
       ),
       hasSupabaseServiceRoleKey: Boolean(
-        process.env.SUPABASE_SERVICE_ROLE_KEY?.trim()
+        process.env.SUPABASE_SERVICE_ROLE_KEY?.trim(),
       ),
       supabaseStorageCallsBucket:
         process.env.SUPABASE_STORAGE_CALLS_BUCKET?.trim() || "calls",
     });
-    console.log(
-      "[calls/analyze] SUPABASE_STORAGE_CALLS_BUCKET JSON:",
-      JSON.stringify(process.env.SUPABASE_STORAGE_CALLS_BUCKET ?? null)
-    );
 
     try {
       assertProductAccess(ctx.subscription);
@@ -273,7 +256,7 @@ export async function POST(request: NextRequest) {
     if (!manager) {
       return NextResponse.json(
         { error: "Менеджер не найден или нет доступа" },
-        { status: 403 }
+        { status: 403 },
       );
     }
 
@@ -294,15 +277,16 @@ export async function POST(request: NextRequest) {
 
     const buffer = Buffer.from(await file.arrayBuffer());
 
-    // Storage: серверный клиент с SUPABASE_SERVICE_ROLE_KEY (обходит Storage RLS).
     const bucketId =
       process.env.SUPABASE_STORAGE_CALLS_BUCKET?.trim() || "calls";
     let uploadErr;
     try {
-      const uploadResult = await supabase.storage.from(bucketId).upload(finalPath, buffer, {
-        contentType: file.type || "application/octet-stream",
-        upsert: false,
-      });
+      const uploadResult = await supabase.storage
+        .from(bucketId)
+        .upload(finalPath, buffer, {
+          contentType: file.type || "application/octet-stream",
+          upsert: false,
+        });
       uploadErr = uploadResult.error;
     } catch (error) {
       console.error("[storage upload thrown]", {
@@ -348,113 +332,47 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: errMessage }, { status: httpStatus });
     }
 
-    console.log("[calls/analyze] assemblyai env", {
-      hasKey: Boolean(process.env.ASSEMBLYAI_API_KEY?.trim()),
-      keyLength: process.env.ASSEMBLYAI_API_KEY?.trim()?.length ?? 0,
-    });
-
-    const assemblyApiKey = process.env.ASSEMBLYAI_API_KEY?.trim();
-    if (!assemblyApiKey) {
-      return NextResponse.json(
-        { error: "Не задан ASSEMBLYAI_API_KEY в окружении" },
-        { status: 500 }
-      );
-    }
-
-    const audioBuffer = buffer;
-    const uploadRes = await fetch("https://api.assemblyai.com/v2/upload", {
-      method: "POST",
-      headers: {
-        authorization: assemblyApiKey,
-        "content-type": "application/octet-stream",
-      },
-      body: audioBuffer,
-    });
-    const uploadJson = await assemblyAiResponseJson<{
-      upload_url?: string;
-      error?: string;
-    }>(uploadRes);
-    const uploadUrl = uploadJson.upload_url;
-    if (!uploadUrl) {
-      return NextResponse.json(
-        {
-          error:
-            uploadJson.error || "AssemblyAI upload: нет upload_url в ответе",
-        },
-        { status: 500 }
-      );
-    }
-
-    const transcriptRes = await fetch("https://api.assemblyai.com/v2/transcript", {
-      method: "POST",
-      headers: {
-        authorization: assemblyApiKey,
-        "content-type": "application/json",
-      },
-      body: JSON.stringify({
-        audio_url: uploadUrl,
-        language_code: "ru",
-        speech_models: ["universal-2"],
-      }),
-    });
-    const transcriptCreateJson = await assemblyAiResponseJson<{
-      id?: string;
-      error?: string;
-    }>(transcriptRes);
-    const transcriptId = transcriptCreateJson.id;
-    if (!transcriptId) {
-      return NextResponse.json(
-        {
-          error:
-            transcriptCreateJson.error ||
-            "AssemblyAI: в ответе нет id транскрипта",
-        },
-        { status: 500 }
-      );
-    }
-
-    let transcript = "";
-    while (true) {
-      await new Promise((r) => setTimeout(r, 2000));
-      const pollRes = await fetch(
-        `https://api.assemblyai.com/v2/transcript/${transcriptId}`,
-        {
-          headers: { authorization: assemblyApiKey },
-        }
-      );
-      const pollData = await assemblyAiResponseJson<{
-        status?: string;
-        text?: string;
-        error?: string;
-      }>(pollRes);
-      if (pollData.status === "completed") {
-        transcript = pollData.text ?? "";
-        break;
-      }
-      if (pollData.status === "error") {
-        throw new Error("Transcription failed");
-      }
-    }
-    const transcriptText = transcript.trim();
-    const transcriptForModel =
-      transcriptText.length > 48_000 ? transcriptText.slice(0, 48_000) : transcriptText;
-
-    const productSignals = buildProductCallSignals(transcriptText, companyProfile);
-
-    let worm: CallAnalysisResponse;
+    let transcriptText: string;
     try {
-      worm = await callWormsoftCallAnalysis({
-        system: SYSTEM_CALL_ANALYSIS,
-        user: buildCallUserPrompt(transcriptForModel, companyProfile),
-      });
+      transcriptText = await transcribeCallAudio(buffer, origName, file.type);
     } catch (e) {
-      if (e instanceof WormsoftError) {
+      if (e instanceof OpenAICallAnalysisError) {
         return NextResponse.json({ error: e.message }, { status: 502 });
       }
       throw e;
     }
 
-    const analysis = mapCallAnalysisToExtended(worm, productSignals);
+    if (!transcriptText) {
+      return NextResponse.json(
+        { error: "Не удалось получить транскрипт из аудио" },
+        { status: 500 },
+      );
+    }
+
+    const transcriptForModel =
+      transcriptText.length > 48_000
+        ? transcriptText.slice(0, 48_000)
+        : transcriptText;
+
+    const productSignals = buildProductCallSignals(
+      transcriptText,
+      companyProfile,
+    );
+
+    let aiAnalysis: CallAnalysisResponse;
+    try {
+      aiAnalysis = await analyzeCallTranscript({
+        system: SYSTEM_CALL_ANALYSIS,
+        user: buildCallUserPrompt(transcriptForModel, companyProfile),
+      });
+    } catch (e) {
+      if (e instanceof OpenAICallAnalysisError) {
+        return NextResponse.json({ error: e.message }, { status: 502 });
+      }
+      throw e;
+    }
+
+    const analysis = mapCallAnalysisToExtended(aiAnalysis, productSignals);
 
     let callRow;
     try {
@@ -468,14 +386,14 @@ export async function POST(request: NextRequest) {
           positives: analysis.positives,
           negatives: analysis.negatives,
           nextTask: analysis.next_task,
-          analysisJson: worm,
+          analysisJson: aiAnalysis,
         },
       });
     } catch (insertErr) {
       console.error(insertErr);
       return NextResponse.json(
         { error: "Не удалось сохранить звонок в базу" },
-        { status: 500 }
+        { status: 500 },
       );
     }
 

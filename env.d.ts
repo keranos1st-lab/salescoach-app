@@ -1,5 +1,7 @@
 declare namespace NodeJS {
   interface ProcessEnv {
+    OPENAI_API_KEY?: string;
+    OPENAI_BASE_URL?: string;
     WORMSOFT_API_URL?: string;
     WORMSOFT_API_KEY?: string;
     WORMSOFT_MODEL?: string;
