@@ -28,7 +28,7 @@ export default async function DashboardPage() {
 
   // depends on authContext: prisma uses companyId from ctx; single query — no Promise.all with getAuthContext.
   const callsRaw = await prisma.call.findMany({
-    where: { companyId },
+    where: { companyId, excluded: false },
     include: { manager: { select: { id: true, name: true } } },
     orderBy: { createdAt: "asc" },
   });

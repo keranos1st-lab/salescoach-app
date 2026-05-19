@@ -23,6 +23,7 @@ export type CallListItem = {
   negatives: unknown;
   next_task: string | null;
   audio_url: string | null;
+  excluded: boolean;
   managers: { name: string } | null;
 };
 
@@ -297,6 +298,32 @@ export function CallsWorkspace({
   const managerBlockedMessage = callsAnalysisBlockedMessage(managerLimit);
   const callsBlockedMessage = callLimit.warningMessage;
 
+  const setCallExcluded = useCallback(async (callId: string, excluded: boolean) => {
+    setCalls((prev) =>
+      prev.map((c) => (c.id === callId ? { ...c, excluded } : c)),
+    );
+    try {
+      const res = await fetch(`/api/calls/${callId}/exclude`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ excluded }),
+      });
+      if (!res.ok) {
+        setCalls((prev) =>
+          prev.map((c) =>
+            c.id === callId ? { ...c, excluded: !excluded } : c,
+          ),
+        );
+      }
+    } catch {
+      setCalls((prev) =>
+        prev.map((c) =>
+          c.id === callId ? { ...c, excluded: !excluded } : c,
+        ),
+      );
+    }
+  }, []);
+
   async function analyze() {
     if (uploadBlocked || !file || !managerId) return;
     setLoading(true);
@@ -342,6 +369,7 @@ export function CallsWorkspace({
           const next = [
             {
               ...json.call!,
+              excluded: json.call!.excluded ?? false,
               managers: mgr ? { name: mgr.name } : null,
             },
             ...prev.filter((c) => c.id !== json.call!.id),
@@ -540,7 +568,11 @@ export function CallsWorkspace({
                       setExpandedCallId((prev) => (prev === c.id ? null : c.id));
                     }
                   }}
-                  className="w-full rounded-xl border border-zinc-800 bg-zinc-900/50 p-4 text-left transition hover:border-zinc-700 hover:bg-zinc-900/70"
+                  className={`w-full rounded-xl border p-4 text-left transition ${
+                    c.excluded
+                      ? "border-zinc-800/60 bg-zinc-900/30 opacity-70 hover:border-zinc-700/80 hover:bg-zinc-900/40"
+                      : "border-zinc-800 bg-zinc-900/50 hover:border-zinc-700 hover:bg-zinc-900/70"
+                  }`}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div className="flex min-w-0 items-center gap-3">
@@ -558,9 +590,16 @@ export function CallsWorkspace({
                         {c.score ?? "—"}
                       </span>
                       <div className="min-w-0">
-                        <p className="truncate text-sm font-medium text-zinc-200">
-                          {c.managers?.name ?? "Менеджер"}
-                        </p>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <p className="truncate text-sm font-medium text-zinc-200">
+                            {c.managers?.name ?? "Менеджер"}
+                          </p>
+                          {c.excluded ? (
+                            <span className="inline-flex shrink-0 rounded-full border border-zinc-600 bg-zinc-800/80 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-zinc-400">
+                              Исключён
+                            </span>
+                          ) : null}
+                        </div>
                         <p className="text-xs text-zinc-500">
                           {new Date(c.created_at).toLocaleString("ru-RU")}
                         </p>
@@ -570,6 +609,22 @@ export function CallsWorkspace({
                       {expandedCallId === c.id ? "Скрыть анализ" : "Показать анализ"}
                     </span>
                   </div>
+
+                  <label
+                    className="mt-3 flex cursor-pointer items-center gap-2 text-sm text-zinc-400"
+                    onClick={(e) => e.stopPropagation()}
+                    onKeyDown={(e) => e.stopPropagation()}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={c.excluded}
+                      onChange={(e) => {
+                        void setCallExcluded(c.id, e.target.checked);
+                      }}
+                      className="h-4 w-4 rounded border-zinc-600 bg-zinc-900 text-[#0d9488] focus:ring-[#0d9488]/50"
+                    />
+                    Не учитывать в статистике
+                  </label>
 
                   <div className="mt-3 rounded-lg border border-[#0d9488]/25 bg-[#0d9488]/10 px-3 py-2">
                     <p className="text-[11px] font-semibold uppercase tracking-wide text-[#5eead4]">

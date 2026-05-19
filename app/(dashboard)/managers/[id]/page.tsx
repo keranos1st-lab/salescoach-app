@@ -14,6 +14,7 @@ type CallRow = {
   created_at: string;
   score: number | null;
   next_task: string | null;
+  excluded: boolean;
 };
 
 function scoreColor(score: number | null) {
@@ -40,7 +41,7 @@ export default async function ManagerDetailsPage(props: PageProps) {
     }),
     prisma.call.findMany({
       where: { companyId, managerId: id },
-      select: { id: true, createdAt: true, score: true },
+      select: { id: true, createdAt: true, score: true, excluded: true },
       orderBy: { createdAt: "desc" },
     }),
   ]);
@@ -54,9 +55,11 @@ export default async function ManagerDetailsPage(props: PageProps) {
     created_at: row.createdAt.toISOString(),
     score: row.score ?? null,
     next_task: null,
+    excluded: row.excluded,
   }));
 
-  const scored = calls.filter((c) => typeof c.score === "number");
+  const includedCalls = calls.filter((c) => !c.excluded);
+  const scored = includedCalls.filter((c) => typeof c.score === "number");
   const avgScore =
     scored.length > 0
       ? Number(
@@ -92,7 +95,7 @@ export default async function ManagerDetailsPage(props: PageProps) {
           </header>
 
           <section className="grid gap-4 sm:grid-cols-3">
-            <MetricCard title="Звонков" value={calls.length} />
+            <MetricCard title="Звонков" value={includedCalls.length} />
             <MetricCard
               title="Средний балл"
               value={avgScore == null ? "—" : avgScore}

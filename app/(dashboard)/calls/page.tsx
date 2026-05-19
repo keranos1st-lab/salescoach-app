@@ -58,6 +58,7 @@ export default async function CallsPage() {
     positives: row.positives,
     negatives: row.negatives,
     next_task: row.nextTask,
+    excluded: row.excluded,
     audio_url: row.audioUrl,
     managers: row.manager ? { name: row.manager.name } : null,
   }));

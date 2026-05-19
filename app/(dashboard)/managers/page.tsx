@@ -32,6 +32,7 @@ export default async function ManagersPage() {
           where: {
             companyId,
             managerId: { in: managerIds },
+            excluded: false,
           },
           select: { managerId: true, score: true },
         });

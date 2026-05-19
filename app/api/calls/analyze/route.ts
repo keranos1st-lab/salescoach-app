@@ -407,6 +407,7 @@ export async function POST(request: NextRequest) {
         transcript: callRow.transcript,
         created_at: callRow.createdAt.toISOString(),
         audio_url: callRow.audioUrl,
+        excluded: callRow.excluded,
       },
       analysis,
     });

@@ -122,6 +122,7 @@ model Call {
   negatives    Json?
   nextTask     String?  @db.Text
   analysisJson Json?
+  excluded     Boolean  @default(false)
   createdAt    DateTime @default(now())
   company      Company  @relation(fields: [companyId], references: [id])
   manager      Manager? @relation(fields: [managerId], references: [id])

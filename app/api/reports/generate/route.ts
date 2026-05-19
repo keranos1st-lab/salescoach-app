@@ -416,6 +416,7 @@ export async function POST(request: NextRequest) {
       where: {
         companyId,
         managerId,
+        excluded: false,
         createdAt: { gte: fromDate, lte: toDate },
       },
       orderBy: { createdAt: "asc" },
