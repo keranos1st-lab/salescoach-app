@@ -19,6 +19,13 @@
     line-height: 1.5 !important;
   }
 
+  h2,
+  h3,
+  .report-section-title {
+    break-after: avoid;
+    page-break-after: avoid;
+  }
+
   .no-print,
   .report-form,
   .report-screen-meta,
@@ -68,12 +75,20 @@
     padding: 0 !important;
     background: #ffffff !important;
     color: #111827 !important;
+    display: flex !important;
+    flex-direction: column !important;
+    gap: 12px !important;
+  }
+
+  .report-article > * {
+    margin-top: 0 !important;
+    margin-bottom: 0 !important;
   }
 
   .report-pdf-cover {
     display: block !important;
-    margin-bottom: 1.25rem;
-    padding-bottom: 1rem;
+    margin-bottom: 0 !important;
+    padding-bottom: 0.75rem !important;
     border-bottom: 2px solid #0d9488;
     break-after: avoid;
     page-break-after: avoid;
@@ -103,13 +118,25 @@
   }
 
   .report-section {
-    break-inside: avoid;
-    page-break-inside: avoid;
-    margin-bottom: 1rem !important;
-    padding: 0.75rem !important;
+    break-inside: auto;
+    page-break-inside: auto;
+    margin-bottom: 0 !important;
+    padding: 12px !important;
     border: 1px solid #d4d4d8 !important;
     background: #f9fafb !important;
     border-radius: 6px !important;
+  }
+
+  .report-summary-section {
+    break-after: avoid;
+    page-break-after: avoid;
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .report-manager-notes {
+    break-before: avoid;
+    page-break-before: avoid;
   }
 
   .report-section-title {
@@ -120,9 +147,33 @@
     letter-spacing: normal !important;
   }
 
-  .report-print-page-break {
-    break-before: page;
-    page-break-before: always;
+  .report-kpi-grid {
+    gap: 8px !important;
+  }
+
+  .report-kpi-card {
+    padding: 6px 8px !important;
+    min-height: 0 !important;
+    height: auto !important;
+  }
+
+  .report-kpi-value {
+    font-size: 18pt !important;
+    line-height: 1.2 !important;
+    margin-top: 0.15rem !important;
+  }
+
+  .report-kpi-label {
+    font-size: 9pt !important;
+  }
+
+  .report-skill-section {
+    break-inside: auto;
+    page-break-inside: auto;
+  }
+
+  .report-skill-list {
+    gap: 8px !important;
   }
 
   .report-skill-card {
@@ -130,6 +181,34 @@
     page-break-inside: avoid;
     background: #ffffff !important;
     border: 1px solid #e5e7eb !important;
+    padding: 8px 10px !important;
+  }
+
+  .report-skill-row {
+    display: flex !important;
+    flex-wrap: nowrap !important;
+    align-items: flex-start !important;
+    justify-content: space-between !important;
+    gap: 12px !important;
+  }
+
+  .report-skill-row-label {
+    flex: 1 1 auto !important;
+    min-width: 0 !important;
+  }
+
+  .report-skill-row-meta {
+    display: flex !important;
+    flex-shrink: 0 !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 8px !important;
+    white-space: nowrap !important;
+  }
+
+  .report-skill-row-value {
+    min-width: 1.5rem !important;
+    text-align: right !important;
   }
 
   .report-list-row,
@@ -165,16 +244,22 @@
     font-size: 10.5pt;
   }
 
+  .report-skill-badge {
+    display: inline-block !important;
+    border-width: 1px !important;
+    border-style: solid !important;
+  }
+
   .report-skill-badge--strong {
-    background-color: #d1fae5 !important;
-    color: #065f46 !important;
-    border-color: #6ee7b7 !important;
+    background-color: #dcfce7 !important;
+    color: #166534 !important;
+    border-color: #86efac !important;
   }
 
   .report-skill-badge--ok {
-    background-color: #fef3c7 !important;
-    color: #92400e !important;
-    border-color: #fcd34d !important;
+    background-color: #fef9c3 !important;
+    color: #854d0e !important;
+    border-color: #fde047 !important;
   }
 
   .report-skill-badge--risk {
@@ -184,9 +269,9 @@
   }
 
   .report-skill-badge--no_data {
-    background-color: #f3f4f6 !important;
-    color: #4b5563 !important;
-    border-color: #d1d5db !important;
+    background-color: #f1f5f9 !important;
+    color: #475569 !important;
+    border-color: #cbd5e1 !important;
   }
 
   table {

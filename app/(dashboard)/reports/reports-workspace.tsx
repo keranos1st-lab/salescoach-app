@@ -337,11 +337,11 @@ export function ReportsWorkspace({ managers }: { managers: ReportManager[] }) {
                 </div>
               </section>
 
-              <section className="report-section rounded-xl border border-zinc-800 bg-zinc-950/60 p-4 print:border-zinc-300 print:bg-zinc-100">
+              <section className="report-section report-summary-section rounded-xl border border-zinc-800 bg-zinc-950/60 p-4 print:border-zinc-300 print:bg-zinc-100">
                 <h3 className="report-section-title text-xs font-semibold uppercase tracking-wide text-zinc-400 print:text-zinc-700">
                   Главный summary
                 </h3>
-                <div className="mt-3 grid gap-3 sm:grid-cols-2 print:grid-cols-2">
+                <div className="report-kpi-grid mt-3 grid gap-3 sm:grid-cols-2 print:grid-cols-2">
                   <ReportKpi label="average_score" value={report.average_score} />
                   <ReportKpi label="period_score" value={report.period_score} />
                 </div>
@@ -357,11 +357,7 @@ export function ReportsWorkspace({ managers }: { managers: ReportManager[] }) {
                 managerName={report.managerName}
                 riskActions={report.manager_risk_actions}
               />
-              <ReportListBlock
-                title="Фокус коучинга"
-                items={report.coaching_focus}
-                pageBreakBefore={report.coaching_focus.length >= 4}
-              />
+              <ReportListBlock title="Фокус коучинга" items={report.coaching_focus} />
               <SkillBreakdownBlock items={report.skill_breakdown} />
               <RiskListWithActions
                 title="Повторяющиеся паттерны"
@@ -372,7 +368,7 @@ export function ReportsWorkspace({ managers }: { managers: ReportManager[] }) {
               <ReportListBlock
                 title="Заметки для руководителя"
                 items={report.manager_notes}
-                pageBreakBefore={report.manager_notes.length >= 4}
+                className="report-manager-notes"
               />
             </article>
           </div>
@@ -513,17 +509,15 @@ function RiskListWithActions({
 function ReportListBlock({
   title,
   items,
-  pageBreakBefore = false,
+  className = "",
 }: {
   title: string;
   items: string[];
-  pageBreakBefore?: boolean;
+  className?: string;
 }) {
   return (
     <section
-      className={`report-section rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 print:border-zinc-300 print:bg-white ${
-        pageBreakBefore ? "report-print-page-break" : ""
-      }`}
+      className={`report-section rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 print:border-zinc-300 print:bg-white ${className}`}
     >
       <h3 className="report-section-title text-sm font-semibold uppercase tracking-wide text-[#5eead4] print:text-black">
         {title}
@@ -557,11 +551,11 @@ function ReportMeta({ label, value }: { label: string; value: string }) {
 
 function ReportKpi({ label, value }: { label: string; value: number | null }) {
   return (
-    <div className="rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2 print:border-zinc-300 print:bg-white">
-      <p className="text-xs uppercase tracking-wide text-zinc-500 print:text-zinc-700">
+    <div className="report-kpi-card rounded-lg border border-zinc-800 bg-zinc-900/40 px-3 py-2 print:border-zinc-300 print:bg-white">
+      <p className="report-kpi-label text-xs uppercase tracking-wide text-zinc-500 print:text-zinc-700">
         {label}
       </p>
-      <p className="mt-1 text-2xl font-semibold tabular-nums text-zinc-100 print:text-zinc-900">
+      <p className="report-kpi-value mt-1 text-2xl font-semibold tabular-nums text-zinc-100 print:text-zinc-900">
         {value == null ? "—" : value}
       </p>
     </div>
@@ -580,24 +574,24 @@ function SkillBreakdownBlock({
   }[];
 }) {
   return (
-    <section className="report-section rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 print:border-zinc-300 print:bg-white">
+    <section className="report-section report-skill-section rounded-xl border border-zinc-800 bg-zinc-950/40 p-4 print:border-zinc-300 print:bg-white">
       <h3 className="report-section-title text-sm font-semibold uppercase tracking-wide text-[#5eead4] print:text-black">
         Навыковый разбор
       </h3>
-      <div className="mt-3 space-y-2.5">
+      <div className="report-skill-list mt-3 space-y-2.5">
         {items.length ? (
           items.map((item) => (
             <div
               key={item.key}
               className="report-skill-card rounded-lg border border-zinc-800 bg-zinc-900/30 p-3 print:border-zinc-300 print:bg-white"
             >
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <p className="text-sm font-medium text-zinc-100 print:text-zinc-900">
+              <div className="report-skill-row flex items-start justify-between gap-3">
+                <p className="report-skill-row-label min-w-0 flex-1 text-sm font-medium text-zinc-100 print:text-zinc-900">
                   {item.label}
                 </p>
-                <div className="flex items-center gap-2">
+                <div className="report-skill-row-meta flex shrink-0 flex-nowrap items-center gap-2">
                   <SkillStatusBadge status={item.status} />
-                  <span className="text-xs tabular-nums text-zinc-400 print:text-zinc-700">
+                  <span className="report-skill-row-value shrink-0 text-xs tabular-nums text-zinc-400 print:text-zinc-700">
                     {item.value == null ? "—" : item.value}
                   </span>
                 </div>
@@ -639,7 +633,9 @@ function SkillStatusBadge({
           : "no_data";
 
   return (
-    <span className={`rounded-full border px-2 py-0.5 text-xs font-medium ${styles}`}>
+    <span
+      className={`report-skill-badge shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${styles}`}
+    >
       {label}
     </span>
   );
