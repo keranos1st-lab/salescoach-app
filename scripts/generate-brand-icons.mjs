@@ -1,4 +1,4 @@
-import { readFileSync, writeFileSync } from "node:fs";
+import { copyFileSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import sharp from "sharp";
@@ -6,6 +6,7 @@ import pngToIco from "png-to-ico";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 const publicDir = join(root, "public");
+const appDir = join(root, "app");
 const svg = readFileSync(join(publicDir, "favicon.svg"));
 
 const outputs = [
@@ -27,3 +28,8 @@ const png32 = await sharp(svg).resize(32, 32).png().toBuffer();
 const ico = await pngToIco([png16, png32]);
 writeFileSync(join(publicDir, "favicon.ico"), ico);
 console.log("Wrote favicon.ico");
+
+copyFileSync(join(publicDir, "favicon.ico"), join(appDir, "favicon.ico"));
+copyFileSync(join(publicDir, "favicon-32x32.png"), join(appDir, "icon.png"));
+copyFileSync(join(publicDir, "apple-touch-icon.png"), join(appDir, "apple-icon.png"));
+console.log("Copied favicon.ico, icon.png, apple-icon.png → app/");

@@ -13,26 +13,29 @@ const geistMono = Geist_Mono({
   subsets: ["latin"],
 });
 
+const siteDescription =
+  "Загружайте звонки менеджеров и получайте автоматический анализ, отчёты по каждому менеджеру и рекомендации для руководителя отдела продаж.";
+
 export const metadata: Metadata = {
   metadataBase: new URL("https://salescoach-app.vercel.app"),
   title: "SalesCoach — ИИ-анализ звонков для руководителей продаж",
-  description:
-    "Загружайте звонки менеджеров, получайте автоматический анализ, управленческие отчёты и рекомендации по коучингу. Выявляйте риски и точки роста каждого менеджера.",
+  description: siteDescription,
   keywords:
-    "анализ звонков, коучинг продажи, ИИ для продаж, управленческий отчёт, SalesCoach",
+    "анализ звонков, отдел продаж, ИИ для продаж, управленческий отчёт, SalesCoach",
   authors: [{ name: "SalesCoach" }],
   creator: "SalesCoach",
   icons: {
     icon: [
       { url: "/favicon.ico", sizes: "any" },
+      { url: "/favicon-32x32.png", sizes: "32x32", type: "image/png" },
+      { url: "/favicon-16x16.png", sizes: "16x16", type: "image/png" },
       { url: "/favicon.svg", type: "image/svg+xml" },
     ],
-    apple: "/apple-touch-icon.png",
+    apple: [{ url: "/apple-touch-icon.png", sizes: "180x180", type: "image/png" }],
   },
   openGraph: {
-    title: "SalesCoach — ИИ-анализ звонков",
-    description:
-      "Автоматический анализ звонков, управленческие отчёты и коучинг для руководителей продаж.",
+    title: "SalesCoach — контроль отдела продаж",
+    description: siteDescription,
     url: "https://salescoach-app.vercel.app",
     siteName: "SalesCoach",
     images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
@@ -41,8 +44,8 @@ export const metadata: Metadata = {
   },
   twitter: {
     card: "summary_large_image",
-    title: "SalesCoach — ИИ-анализ звонков",
-    description: "Автоматический анализ звонков и коучинг для руководителей продаж.",
+    title: "SalesCoach — контроль отдела продаж",
+    description: siteDescription,
     images: ["/opengraph-image"],
   },
 };
@@ -59,9 +62,12 @@ export default function RootLayout({
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
       <head>
+        <link rel="shortcut icon" href="/favicon.ico" />
         <link rel="icon" href="/favicon.ico" sizes="any" />
+        <link rel="icon" type="image/png" sizes="32x32" href="/favicon-32x32.png" />
+        <link rel="icon" type="image/png" sizes="16x16" href="/favicon-16x16.png" />
         <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
-        <link rel="apple-touch-icon" href="/apple-touch-icon.png" />
+        <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
       </head>
       <body className="min-h-screen flex flex-col">{children}</body>
     </html>
