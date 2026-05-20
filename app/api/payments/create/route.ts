@@ -75,7 +75,7 @@ export async function POST(req: Request) {
       ReturnUrl: `${appUrl}/profile?payment=success`,
       Shp_plan: plan,
       Shp_userId: userId,
-      ...(isTest ? { IsTest: "1" } : {}),
+      IsTest: isTest ? "1" : "0",
     });
 
     const confirmationUrl = `https://auth.robokassa.ru/Merchant/Index.aspx?${params.toString()}`;
