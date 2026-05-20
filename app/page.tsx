@@ -4,16 +4,20 @@ import { SiteFooter } from "@/components/site-footer";
 
 const howItWorksSteps = [
   {
-    emoji: "📁",
-    text: "Загрузите запись звонка (MP3, WAV, WEBM, M4A)",
+    num: "01",
+    title: "Загружаете запись",
+    description: "Любой формат: MP3, WAV, WEBM, M4A",
   },
   {
-    emoji: "🤖",
-    text: "ИИ транскрибирует и анализирует разговор",
+    num: "02",
+    title: "ИИ анализирует",
+    description:
+      "Транскрибирует звонок и оценивает качество работы менеджера",
   },
   {
-    emoji: "📊",
-    text: "Получите разбор: ошибки, сильные стороны, оценку по скрипту",
+    num: "03",
+    title: "Получаете разбор",
+    description: "Ошибки, сильные стороны, оценка по скрипту",
   },
 ] as const;
 
@@ -40,9 +44,12 @@ export default function HomePage() {
         <div className="mx-auto max-w-4xl">
           <section className="text-center">
             <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
-              Узнайте, почему менеджеры теряют сделки
+              SalesCoach <span className="text-[#5eead4]">AI</span>
             </h1>
-            <p className="mx-auto mt-4 max-w-xl text-balance text-zinc-400 sm:text-lg">
+            <p className="mx-auto mt-4 max-w-xl text-balance text-lg font-medium text-zinc-300 sm:text-xl">
+              Узнайте, почему менеджеры теряют сделки
+            </p>
+            <p className="mx-auto mt-3 max-w-xl text-balance text-zinc-400 sm:text-lg">
               SalesCoach анализирует звонки и показывает ошибки каждого
               менеджера. Результат — за минуты, без ручной прослушки.
             </p>
@@ -72,38 +79,30 @@ export default function HomePage() {
                 В кабинет →
               </Link>
             </div>
-            <p className="mt-3 text-center text-xs text-zinc-500">
-              4 дня бесплатно · до 20 звонков · без карты
-            </p>
           </section>
 
           <section className="mt-20 sm:mt-24">
             <h2 className="text-center text-2xl font-semibold tracking-tight text-zinc-100 sm:text-3xl">
               Как это работает
             </h2>
-            <ul className="mt-8 space-y-4">
-              {howItWorksSteps.map((step, index) => (
-                <li
-                  key={step.text}
-                  className="flex gap-4 rounded-2xl border border-zinc-800 bg-zinc-900/60 px-4 py-4 text-left sm:px-6 sm:py-5"
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {howItWorksSteps.map((step) => (
+                <article
+                  key={step.num}
+                  className="rounded-2xl border border-zinc-800 bg-zinc-900/60 p-6 text-left"
                 >
-                  <span
-                    className="text-2xl leading-none sm:text-[1.75rem]"
-                    aria-hidden
-                  >
-                    {step.emoji}
-                  </span>
-                  <div className="min-w-0 flex-1">
-                    <p className="text-xs font-semibold uppercase tracking-wide text-zinc-500">
-                      Шаг {index + 1}
-                    </p>
-                    <p className="mt-1 text-sm leading-relaxed text-zinc-200 sm:text-base">
-                      {step.text}
-                    </p>
-                  </div>
-                </li>
+                  <p className="text-xs font-semibold tabular-nums tracking-widest text-zinc-500">
+                    {step.num}
+                  </p>
+                  <h3 className="mt-3 text-lg font-semibold text-zinc-100">
+                    {step.title}
+                  </h3>
+                  <p className="mt-2 text-sm leading-relaxed text-zinc-400">
+                    {step.description}
+                  </p>
+                </article>
               ))}
-            </ul>
+            </div>
           </section>
 
           <section className="mt-20 sm:mt-24">
