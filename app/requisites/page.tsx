@@ -10,7 +10,7 @@ const requisites = [
   ["Email", "keranosai@mail.ru"],
   ["Телефон", "+7 995 396-89-20"],
   ["Юридический адрес", "г. Владивосток"],
-  ["Сайт", "saleschek.ru"],
+  ["Сайт", "vizistudio.ru"],
 ] as const;
 
 export default function RequisitesPage() {
@@ -29,7 +29,20 @@ export default function RequisitesPage() {
                   <th className="w-1/3 bg-zinc-900/80 px-4 py-3 text-left text-sm font-semibold text-zinc-300">
                     {label}
                   </th>
-                  <td className="px-4 py-3 text-sm text-zinc-200">{value}</td>
+                  <td className="px-4 py-3 text-sm text-zinc-200">
+                    {label === "Сайт" ? (
+                      <a
+                        href="https://vizistudio.ru"
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-[#5eead4] transition hover:underline"
+                      >
+                        {value}
+                      </a>
+                    ) : (
+                      value
+                    )}
+                  </td>
                 </tr>
               ))}
             </tbody>

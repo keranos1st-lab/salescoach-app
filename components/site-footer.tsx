@@ -3,6 +3,7 @@ import Link from "next/link";
 
 const footerLinks = [
   { href: "/pricing", label: "Тарифы" },
+  { href: "/faq", label: "FAQ" },
   { href: "/offer", label: "Публичная оферта" },
   { href: "/privacy", label: "Политика ПД" },
   { href: "/contacts", label: "Контакты" },
