@@ -38,7 +38,14 @@ export const metadata: Metadata = {
     description: siteDescription,
     url: "https://salescoach-app.vercel.app",
     siteName: "SalesCoach",
-    images: [{ url: "/opengraph-image", width: 1200, height: 630 }],
+    images: [
+      {
+        url: "/og-image.png",
+        width: 1200,
+        height: 630,
+        alt: "SalesCoach — Контроль отдела продаж на основе данных",
+      },
+    ],
     locale: "ru_RU",
     type: "website",
   },
@@ -46,7 +53,7 @@ export const metadata: Metadata = {
     card: "summary_large_image",
     title: "SalesCoach — контроль отдела продаж",
     description: siteDescription,
-    images: ["/opengraph-image"],
+    images: ["/og-image.png"],
   },
 };
 

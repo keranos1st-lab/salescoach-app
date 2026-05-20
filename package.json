@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "icons": "node scripts/generate-brand-icons.mjs",
+    "og": "node scripts/generate-og-image.mjs",
     "postinstall": "prisma generate",
     "warmup": "curl https://salescoach-app.vercel.app/api/auth/session"
   },
