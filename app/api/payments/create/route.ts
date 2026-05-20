@@ -63,6 +63,11 @@ export async function POST(req: Request) {
     });
 
     const userId = session.user.id;
+    const userEmail = session.user.email?.trim();
+    if (!userEmail) {
+      return NextResponse.json({ error: "Email пользователя не найден" }, { status: 400 });
+    }
+
     const receiptJson = buildRobokassaReceiptJson(plan as RobokassaPaidPlanKey, amountRub);
     const signature = buildRobokassaPaymentSignature({
       merchantLogin: login,
@@ -87,6 +92,7 @@ export async function POST(req: Request) {
       Receipt: receiptJson,
       SignatureValue: signature,
       ReturnUrl: `${appUrl}/profile?payment=success`,
+      Email: userEmail,
       Shp_plan: plan,
       Shp_userId: userId,
       IsTest: isTest ? "1" : "0",
