@@ -4,6 +4,7 @@ import Link from "next/link";
 const footerLinks = [
   { href: "/pricing", label: "Тарифы" },
   { href: "/offer", label: "Публичная оферта" },
+  { href: "/privacy", label: "Политика ПД" },
   { href: "/contacts", label: "Контакты" },
   { href: "/requisites", label: "Реквизиты" },
 ] as const;
