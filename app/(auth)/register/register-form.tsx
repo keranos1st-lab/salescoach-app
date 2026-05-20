@@ -12,6 +12,8 @@ export function RegisterForm() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [agreeOffer, setAgreeOffer] = useState(false);
+  const [agreePrivacy, setAgreePrivacy] = useState(false);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -93,9 +95,52 @@ export function RegisterForm() {
           className="mt-1 w-full rounded-lg border border-zinc-700 bg-zinc-950 px-3 py-2 text-zinc-100 outline-none focus:border-[#0d9488]"
         />
       </label>
+
+      <div className="space-y-2 text-sm text-zinc-400">
+        <label className="flex cursor-pointer items-start gap-2">
+          <input
+            type="checkbox"
+            checked={agreeOffer}
+            onChange={(e) => setAgreeOffer(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-600 bg-zinc-950 text-[#0d9488] focus:ring-[#0d9488]/50"
+          />
+          <span>
+            Я принимаю{" "}
+            <a
+              href="/offer"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#5eead4] hover:underline"
+            >
+              публичную оферту
+            </a>
+          </span>
+        </label>
+
+        <label className="flex cursor-pointer items-start gap-2">
+          <input
+            type="checkbox"
+            checked={agreePrivacy}
+            onChange={(e) => setAgreePrivacy(e.target.checked)}
+            className="mt-0.5 h-4 w-4 shrink-0 rounded border-zinc-600 bg-zinc-950 text-[#0d9488] focus:ring-[#0d9488]/50"
+          />
+          <span>
+            Я согласен на{" "}
+            <a
+              href="/privacy"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-[#5eead4] hover:underline"
+            >
+              обработку персональных данных
+            </a>
+          </span>
+        </label>
+      </div>
+
       <button
         type="submit"
-        disabled={pending}
+        disabled={!agreeOffer || !agreePrivacy || pending}
         className="w-full rounded-lg bg-[#0d9488] py-2.5 text-sm font-medium text-white transition hover:bg-[#0f766e] disabled:opacity-50"
       >
         {pending ? "Создание…" : "Создать аккаунт"}
