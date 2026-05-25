@@ -110,6 +110,24 @@ export function companyProfileFromJson(
   return rowToCompanyProfile(row, userId);
 }
 
+/** Достаточно данных в анкете продукта для осмысленного анализа звонков. */
+export function isCompanyProfileFilled(
+  profile: CompanyProfile | null | undefined,
+): boolean {
+  if (!profile) return false;
+  const hasText = (value: string | null | undefined) => Boolean(value?.trim());
+  const hasList = (items: string[] | null | undefined) =>
+    Boolean(items?.some((item) => item.trim()));
+  return (
+    hasText(profile.niche) ||
+    hasText(profile.manual_description) ||
+    hasText(profile.parsed_text) ||
+    hasList(profile.services) ||
+    hasList(profile.products) ||
+    hasList(profile.unique_selling_points)
+  );
+}
+
 export function companyProfileToJson(profile: CompanyProfile): CompanyProfileJson {
   return {
     site_url: profile.site_url,
